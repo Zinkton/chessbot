@@ -27,5 +27,5 @@ class MyHandler(BaseHTTPRequestHandler):
 
 if __name__ == '__main__':
 	httpd = HTTPServer(('', 8000), MyHandler)
-	print('serving')
+	print('serving 8000')
 	httpd.serve_forever()

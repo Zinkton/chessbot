@@ -364,7 +364,15 @@ def RecSSS(node, board, depth, max_depth):
 		for x in range(len(legal_moves)):
 			s_src = board.piece_type_at(legal_moves[x].from_square)
 			s_dest = board.piece_type_at(legal_moves[x].to_square)
-			sv = node[7] + (position_value[chess.WHITE][s_src][legal_moves[x].to_square] - position_value[chess.WHITE][s_src][legal_moves[x].from_square])
+   
+			if (legal_moves[x].promotion):
+				prom = legal_moves[x].promotion
+				pos_score = (position_value[chess.WHITE][prom][legal_moves[x].to_square] - position_value[chess.WHITE][s_src][legal_moves[x].from_square])
+				prom_score = piece_value[prom] - piece_value[s_src]
+				sv = node[7] + pos_score + prom_score
+			else:
+				sv = node[7] + (position_value[chess.WHITE][s_src][legal_moves[x].to_square] - position_value[chess.WHITE][s_src][legal_moves[x].from_square])
+
 			if s_dest:
 				sv += piece_value[s_dest] + position_value[chess.BLACK][s_dest][legal_moves[x].to_square]
 			son = [legal_moves[x], nodestatus.UNEXPANDED, node[2], [], node, legal_moves, x, sv]
@@ -376,7 +384,13 @@ def RecSSS(node, board, depth, max_depth):
 				if s_legal_moves:
 					gs_src = board.piece_type_at(s_legal_moves[0].from_square)
 					gs_dest = board.piece_type_at(s_legal_moves[0].to_square)
-					gsv = sv - (position_value[chess.BLACK][gs_src][s_legal_moves[0].to_square] - position_value[chess.BLACK][gs_src][s_legal_moves[0].from_square])
+					if (s_legal_moves[0].promotion):
+						g_prom = s_legal_moves[0].promotion
+						g_pos_score = (position_value[chess.BLACK][g_prom][s_legal_moves[0].to_square] - position_value[chess.BLACK][gs_src][s_legal_moves[0].from_square])
+						g_prom_score = piece_value[g_prom] - piece_value[gs_src]
+						gsv = sv - g_pos_score - g_prom_score
+					else:
+						gsv = sv - (position_value[chess.BLACK][gs_src][s_legal_moves[0].to_square] - position_value[chess.BLACK][gs_src][s_legal_moves[0].from_square])
 					if gs_dest:
 						gsv -= piece_value[gs_dest] + position_value[chess.WHITE][gs_dest][s_legal_moves[0].to_square]
 					gson = [s_legal_moves[0], nodestatus.UNEXPANDED, node[2], [], son, s_legal_moves, 0, gsv]
@@ -402,7 +416,13 @@ def RecSSS(node, board, depth, max_depth):
 			gson[3] = []
 			gs_src = board.piece_type_at(gson[0].from_square)
 			gs_dest = board.piece_type_at(gson[0].to_square)
-			gson[7] = gson[4][7] - position_value[chess.BLACK][gs_src][gson[0].to_square] + position_value[chess.BLACK][gs_src][gson[0].from_square]
+			if (gson[0].promotion):
+				gs_prom = gson[0].promotion
+				gs_pos_score = position_value[chess.BLACK][gs_prom][gson[0].to_square] - position_value[chess.BLACK][gs_src][gson[0].from_square]
+				gs_prom_score = piece_value[gs_prom] - piece_value[gs_src]
+				gson[7] = gson[4][7] - gs_pos_score - gs_prom_score
+			else:
+				gson[7] = gson[4][7] - (position_value[chess.BLACK][gs_src][gson[0].to_square] - position_value[chess.BLACK][gs_src][gson[0].from_square])
 			if gs_dest:
 				gson[7] -= piece_value[gs_dest] + position_value[chess.WHITE][gs_dest][gson[0].to_square] 
 		board.pop()
@@ -416,7 +436,13 @@ def solve_position(input):
 	(board, max_depth, move) = (input[0], input[1], input[2])
 	src_piece = board.piece_type_at(move.from_square)
 	dest_piece = board.piece_type_at(move.to_square)
-	v = -(position_value[chess.BLACK][src_piece][move.to_square] - position_value[chess.BLACK][src_piece][move.from_square])
+	if (move.promotion):
+		prom = move.promotion
+		pos_score = position_value[chess.BLACK][prom][move.to_square] - position_value[chess.BLACK][src_piece][move.from_square]
+		prom_score = piece_value[prom] - piece_value[src_piece]
+		v = -(pos_score + prom_score)
+	else:
+		v = -(position_value[chess.BLACK][src_piece][move.to_square] - position_value[chess.BLACK][src_piece][move.from_square])
 	if dest_piece:
 		v -= piece_value[dest_piece] + position_value[chess.WHITE][dest_piece][move.to_square]
 	board.push(move)
@@ -456,7 +482,6 @@ def process_scores(board, move_scores, max_depth):
 					if board.board_fen() == last_fen[0]:
 						del results[0]
 					board.pop()
-
 		best_results = [result for result in results if result[1] == results[0][1]]
 		for best_result in best_results:
 			if best_result[0].promotion:
@@ -466,10 +491,9 @@ def process_scores(board, move_scores, max_depth):
 					best_result[1] -= piece_value[best_result[0].promotion]
 			if board.piece_at(best_result[0].to_square):
 				if board.turn:
-					best_result[1] += piece_value[board.piece_at(best_result[0].to_square)]
+					best_result[1] += piece_value[board.piece_at(best_result[0].to_square).piece_type]
 				else:
-					best_result[1] -= piece_value[board.piece_at(best_result[0].to_square)]
-
+					best_result[1] -= piece_value[board.piece_at(best_result[0].to_square).piece_type]
 		# for best_result in best_results:
 		# 	board.push(best_result[0])
 		# 	board.has_white_castled_c = False

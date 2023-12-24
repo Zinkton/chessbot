@@ -412,7 +412,6 @@ def RecSSS(node, board, depth, max_depth):
 
 	return gson[2]
 
-
 def solve_position(input):
 	(board, max_depth, move) = (input[0], input[1], input[2])
 	src_piece = board.piece_type_at(move.from_square)
@@ -462,14 +461,14 @@ def process_scores(board, move_scores, max_depth):
 		for best_result in best_results:
 			if best_result[0].promotion:
 				if board.turn:
-					best_result[1] += 200
+					best_result[1] += piece_value[best_result[0].promotion]
 				else:
-					best_result[1] -= 200
+					best_result[1] -= piece_value[best_result[0].promotion]
 			if board.piece_at(best_result[0].to_square):
 				if board.turn:
-					best_result[1] += 100
+					best_result[1] += piece_value[board.piece_at(best_result[0].to_square)]
 				else:
-					best_result[1] -= 100
+					best_result[1] -= piece_value[board.piece_at(best_result[0].to_square)]
 
 		# for best_result in best_results:
 		# 	board.push(best_result[0])

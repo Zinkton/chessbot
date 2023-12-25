@@ -5,7 +5,7 @@ class NodeState(Enum):
 	LIVE = 1
 	SOLVED = 2
 
-MAX_DEPTH = 5
+MAX_DEPTH = 6
 MAX_FEN_HISTORY = 2
 PROCESS_COUNT = 8
 MAX_VALUE = 10**11

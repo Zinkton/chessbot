@@ -47,20 +47,19 @@ def _expand_node(node: ChessNode, board, depth, max_depth):
     if not legal_moves:
         node.state = NodeState.SOLVED
         return min(0, node.min_value)
-    
-    for x in range(len(legal_moves)):
-        move_value = _calculate_move_value(legal_moves[x], board)
-        son_value = node.value + move_value
-        son_node = ChessNode(move=legal_moves[x], value=son_value, min_value=node.min_value, children=[], parent=node, legal_moves=legal_moves, move_index=x)
-        board.push(legal_moves[x])
+    evaluated_moves = _sorted_evaluated_legal_moves(board, legal_moves)
+    for x in range(len(evaluated_moves)):
+        son_value = node.value + evaluated_moves[x][1]
+        son_node = ChessNode(move=evaluated_moves[x][0], value=son_value, min_value=node.min_value, children=[], parent=node, legal_moves=evaluated_moves, move_index=x)
+        board.push(evaluated_moves[x][0])
         if _is_leaf_node(None, board, depth + 1, max_depth):
             node.children.append(son_node)
         else:
             s_legal_moves = list(board.legal_moves)
             if s_legal_moves:
-                move_value = _calculate_move_value(s_legal_moves[0], board)
-                grandson_value = son_value - move_value
-                grandson_node = ChessNode(move=s_legal_moves[0], value=grandson_value, min_value=node.min_value, children=[], parent=son_node, legal_moves=s_legal_moves, move_index=0)
+                s_evaluated_moves = _sorted_evaluated_legal_moves(board, s_legal_moves)
+                grandson_value = son_value - s_evaluated_moves[0][1]
+                grandson_node = ChessNode(move=s_evaluated_moves[0][0], value=grandson_value, min_value=node.min_value, children=[], parent=son_node, legal_moves=s_evaluated_moves, move_index=0)
                 node.children.append(grandson_node)
             else:
                 node.children.append(son_node)
@@ -80,11 +79,10 @@ def _process_children(current_node: ChessNode, board, depth, max_depth) -> Chess
             board.pop()
         if is_gson and grandson_node.state == NodeState.SOLVED and grandson_node.move_index != (len(grandson_node.legal_moves) - 1):
             grandson_node.move_index += 1
-            grandson_node.move = grandson_node.legal_moves[grandson_node.move_index]
+            grandson_node.move = grandson_node.legal_moves[grandson_node.move_index][0]
             grandson_node.state = NodeState.UNEXPANDED
             grandson_node.children = []
-            move_value = _calculate_move_value(grandson_node.move, board)
-            grandson_node.value = grandson_node.parent.value - move_value
+            grandson_node.value = grandson_node.parent.value - grandson_node.legal_moves[grandson_node.move_index][1]
         board.pop()
         grandson_node = max(current_node.children, key=lambda s: s.min_value)
         
@@ -108,3 +106,10 @@ def _calculate_move_value(move, board):
         value += piece_value[dest_piece] + position_value[not board.turn][dest_piece][move.to_square]
         
     return value
+
+def _sorted_evaluated_legal_moves(board, legal_moves):
+    evaluated_legal_moves = [[move, _calculate_move_value(move, board)] for move in legal_moves]
+    evaluated_legal_moves.sort(key=lambda x: x[1], reverse=True)
+    
+    return evaluated_legal_moves
+            

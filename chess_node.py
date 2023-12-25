@@ -1,11 +1,13 @@
 from constants import NodeState
+import constants
 
 class ChessNode:
-    def __init__(self, board, move=None, depth=0, parent=None, children=None):
-        self.board = board.copy()
+    def __init__(self, move, value, min_value = constants.MAX_VALUE, children = None, parent = None, legal_moves = None, move_index = None):
         self.move = move
-        self.depth = depth
+        self.min_value = min_value
+        self.children = children
         self.parent = parent
-        self.children = children or []
-        self.value = None
+        self.legal_moves = legal_moves
+        self.move_index = move_index
+        self.value = value
         self.state = NodeState.UNEXPANDED

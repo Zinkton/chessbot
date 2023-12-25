@@ -44,9 +44,9 @@ class ChessBot():
         board.push(move)
         self.fen_history.append(board.board_fen())
 
-    def _evaluate_and_filter_best_moves(self, board, move_scores, max_depth):
+    def _evaluate_and_filter_best_moves(self, board, unevaluated_moves, max_depth):
         # A board copy to manipulate, depth of search and the move to evaluate
-        solve_position_params = [[board.copy(), max_depth, move] for move, _ in move_scores]
+        solve_position_params = [[board.copy(), max_depth, move] for move, _ in unevaluated_moves]
         
         with Pool(processes=constants.PROCESS_COUNT) as p:
             evaluated_moves = p.map(solve_position, solve_position_params)

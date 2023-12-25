@@ -47,6 +47,7 @@ def _expand_node(node: ChessNode, board, depth, max_depth):
     if not legal_moves:
         node.state = NodeState.SOLVED
         return min(0, node.min_value)
+    
     for x in range(len(legal_moves)):
         move_value = _calculate_move_value(legal_moves[x], board)
         son_value = node.value + move_value
@@ -64,7 +65,7 @@ def _expand_node(node: ChessNode, board, depth, max_depth):
             else:
                 node.children.append(son_node)
         board.pop()
-        
+
 def _process_children(current_node: ChessNode, board, depth, max_depth) -> ChessNode:
     grandson_node = max(current_node.children, key=lambda s: s.min_value)
     while grandson_node.min_value == current_node.min_value and grandson_node.state != NodeState.SOLVED:

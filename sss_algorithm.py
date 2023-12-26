@@ -1,4 +1,5 @@
 import chess
+import evaluation
 from constants import NodeState
 from evaluation import piece_value, position_value
 from chess_node import ChessNode
@@ -93,23 +94,35 @@ def _process_children(current_node: ChessNode, board, depth, max_depth) -> Chess
     return grandson_node
 
 def _calculate_move_value(move, board):
+    castle_value = _check_castling(board, move)
+    if castle_value is not None:
+        return castle_value
+    
     value = 0
     src_piece = board.piece_type_at(move.from_square)
     dest_piece = board.piece_type_at(move.to_square)
     
-    if (move.promotion):
+    if move.promotion:
         prom = move.promotion
         pos_score = position_value[board.turn][prom][move.to_square] - position_value[board.turn][src_piece][move.from_square]
         prom_score = piece_value[prom] - piece_value[src_piece]
         value = pos_score + prom_score
     else:
         value = position_value[board.turn][src_piece][move.to_square] - position_value[board.turn][src_piece][move.from_square]
-    
-    # If we capture, add score based on captured piece value and position value
+
     if dest_piece:
+        # If we capture, add score based on captured piece value and position value
         value += piece_value[dest_piece] + position_value[not board.turn][dest_piece][move.to_square]
         
     return value
+
+def _check_castling(board, move):
+    if board.kings & chess.BB_SQUARES[move.from_square]:
+        diff = chess.square_file(move.from_square) - chess.square_file(move.to_square)
+        if abs(diff) > 1:
+            return evaluation.K_CASTLING_VALUE if diff < 0 else evaluation.Q_CASTLING_VALUE
+        
+    return None
 
 def _sorted_evaluated_legal_moves(board, legal_moves):
     evaluated_legal_moves = [[move, _calculate_move_value(move, board)] for move in legal_moves]

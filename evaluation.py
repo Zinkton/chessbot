@@ -86,3 +86,6 @@ position_value = {
         chess.KING: king_table.copy()
     }
 }
+
+K_CASTLING_VALUE = position_value[chess.WHITE][chess.ROOK][chess.F1] - position_value[chess.WHITE][chess.ROOK][chess.H1] + position_value[chess.WHITE][chess.KING][chess.G1] - position_value[chess.WHITE][chess.KING][chess.E1]
+Q_CASTLING_VALUE = position_value[chess.WHITE][chess.ROOK][chess.D1] - position_value[chess.WHITE][chess.ROOK][chess.A1] + position_value[chess.WHITE][chess.KING][chess.C1] - position_value[chess.WHITE][chess.KING][chess.E1]

@@ -11,3 +11,6 @@ class ChessNode:
         self.move_index = move_index
         self.value = value
         self.state = NodeState.UNEXPANDED
+        
+    def __repr__(self):
+        return '; '.join([self.move, self.min_value, len(self.children), self.parent, self.value, self.state])

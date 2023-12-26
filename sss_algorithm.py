@@ -21,7 +21,9 @@ def _recursiveSearch(current_node: ChessNode, board, depth, max_depth):
         return min(leaf_value, current_node.min_value)
     
     if current_node.state == NodeState.UNEXPANDED:
-        _expand_node(current_node, board, depth, max_depth)
+        leaf_value = _expand_node(current_node, board, depth, max_depth)
+        if leaf_value is not None:
+            return leaf_value
     
     grandson_node = _process_children(current_node, board, depth, max_depth)
     
@@ -64,6 +66,8 @@ def _expand_node(node: ChessNode, board, depth, max_depth):
             else:
                 node.children.append(son_node)
         board.pop()
+        
+    return None
 
 def _process_children(current_node: ChessNode, board, depth, max_depth) -> ChessNode:
     grandson_node = max(current_node.children, key=lambda s: s.min_value)

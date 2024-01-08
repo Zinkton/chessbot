@@ -5,7 +5,7 @@ from chess_bot import ChessBot
 
 class MyHandler(BaseHTTPRequestHandler):
     def __init__(self, *args, **kwargs):
-        self.chess_bot = ChessBot()
+        self.chess_ai = ChessBot()
         
         super().__init__(*args, **kwargs)
 
@@ -29,12 +29,12 @@ class MyHandler(BaseHTTPRequestHandler):
         self.send_header('Access-Control-Allow-Origin', '*')
         self.send_header('Content-Type', 'application/json')
         self.end_headers()
-        move = self.chess_bot.get_move(input)
+        move = self.chess_ai.get_move(input)
         response = '{"move":"%s"}' % move
         self.wfile.write(response.encode('UTF-8'))
 
 
 if __name__ == '__main__':
-    httpd = HTTPServer(('', 8000), MyHandler)
-    print('serving 8000')
+    httpd = HTTPServer(('', 8001), MyHandler)
+    print('serving 8001')
     httpd.serve_forever()

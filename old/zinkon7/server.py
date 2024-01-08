@@ -26,6 +26,6 @@ class MyHandler(BaseHTTPRequestHandler):
 		self.wfile.write(response.encode('UTF-8'))
 
 if __name__ == '__main__':
-	httpd = HTTPServer(('', 8001), MyHandler)
-	print('serving 8001')
+	httpd = HTTPServer(('', 8002), MyHandler)
+	print('serving 8002')
 	httpd.serve_forever()

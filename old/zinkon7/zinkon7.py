@@ -96,7 +96,7 @@ def get_move(input):
 	board = Board(fen)
 	time_left = input['remainingSeconds']
 	is_real_time = input['isRealTime']
-	max_depth = 4
+	max_depth = 5
 	enemy_piece_count = get_piece_count(board, not board.turn)
 	ally_piece_count = get_piece_count(board, board.turn)
 	total_piece_count = enemy_piece_count + ally_piece_count

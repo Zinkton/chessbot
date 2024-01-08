@@ -51,10 +51,10 @@ class ChessBot():
         with Pool(processes=constants.PROCESS_COUNT) as p:
             evaluated_moves = p.map(solve_position, solve_position_params)
           
-        winning_evaluated_moves = self._filter_winning_evaluated_moves(evaluated_moves)
-        if len(winning_evaluated_moves) > 1:
-            self._remove_repeating_move(winning_evaluated_moves, board)
-            evaluated_moves = winning_evaluated_moves
+        #winning_evaluated_moves = self._filter_winning_evaluated_moves(evaluated_moves)
+        if len(evaluated_moves) > 1:
+            self._remove_repeating_move(evaluated_moves, board)
+            evaluated_moves = evaluated_moves
             
         best_evaluated_moves = self._filter_best_evaluated_moves(evaluated_moves)
         if len(best_evaluated_moves) > 1:

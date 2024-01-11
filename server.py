@@ -1,12 +1,14 @@
+from functools import partial
 from http.server import HTTPServer, BaseHTTPRequestHandler
 import json
+import argparse
 from chess_bot import ChessBot
 
 
 class MyHandler(BaseHTTPRequestHandler):
-    def __init__(self, *args, **kwargs):
-        self.chess_ai = ChessBot()
-        
+    def __init__(self, chess_bot, *args, **kwargs):
+        self.chess_bot = chess_bot
+
         super().__init__(*args, **kwargs)
 
     def do_OPTIONS(self):
@@ -29,12 +31,20 @@ class MyHandler(BaseHTTPRequestHandler):
         self.send_header('Access-Control-Allow-Origin', '*')
         self.send_header('Content-Type', 'application/json')
         self.end_headers()
-        move = self.chess_ai.get_move(input)
+        move = self.chess_bot.get_move(input)
         response = '{"move":"%s"}' % move
         self.wfile.write(response.encode('UTF-8'))
 
 
 if __name__ == '__main__':
-    httpd = HTTPServer(('', 8000), MyHandler)
-    print('serving 8000')
+    parser = argparse.ArgumentParser(description='HTTP Server for Chess Bot')
+    parser.add_argument('--port', type=int, default=8000, help='Port to run the HTTP server on (default: 8000)')
+    args = parser.parse_args()
+
+    chess_bot = ChessBot()
+    handler_with_chess_bot = partial(MyHandler, chess_bot)
+    
+    port = args.port
+    httpd = HTTPServer(('', port), handler_with_chess_bot)
+    print(f'Serving on port {port}')
     httpd.serve_forever()

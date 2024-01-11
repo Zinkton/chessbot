@@ -1,6 +1,7 @@
 import constants
 import random
-from time import perf_counter
+import requests
+from time import perf_counter, sleep
 from utilities import flip_and_mirror_fen, invert_rank
 from evaluation import piece_value
 from chess import Board
@@ -15,6 +16,11 @@ class ChessBot():
     # Main chess bot logic
     def get_move(self, bot_input):
         fen = bot_input['boardFen']
+        if constants.OPENING_BOOK:
+            move = self.opening_book(fen)
+            if move is not None:
+                return move
+            
         # We want the algorithm to always calculate moves from black's POV so we do some FEN manipulation
         is_board_flipped = fen.split(' ')[1] == 'w'
         if is_board_flipped:
@@ -29,6 +35,24 @@ class ChessBot():
         if is_board_flipped:
             return invert_rank(move)
         return move
+    
+    def opening_book(self, fen):
+        r = requests.get(url='https://explorer.lichess.ovh/masters', params={'fen': fen})
+        data = r.json()
+        moves = data['moves']
+        if not moves:
+            return None
+        sleep(1)
+        moves.sort(key=lambda x: x['draws'] + x['white'] + x['black'], reverse=True)
+        return moves[0]['uci']
+        # board = Board(fen)
+        # for move in moves:
+        #     if board.turn and move['white'] > move['black']:
+        #         return move['uci']
+        #     if not board.turn and move['black'] > move['white']:
+        #         return move['uci']
+                
+        # return moves[0]['uci']
 
     def _select_random_best_move(self, board):
         unevaluated_moves = [[move, 0] for move in board.legal_moves]
@@ -50,7 +74,7 @@ class ChessBot():
         
         with Pool(processes=constants.PROCESS_COUNT) as p:
             evaluated_moves = p.map(solve_position, solve_position_params)
-          
+
         #winning_evaluated_moves = self._filter_winning_evaluated_moves(evaluated_moves)
         if len(evaluated_moves) > 1:
             self._remove_repeating_move(evaluated_moves, board)
@@ -67,13 +91,13 @@ class ChessBot():
     def _filter_winning_evaluated_moves(self, evaluated_moves):
         return [evaluated_move for evaluated_move in evaluated_moves if evaluated_move[1] <= 0]
         
-    def _remove_repeating_move(self, winning_evaluated_moves, board):
+    def _remove_repeating_move(self, evaluated_moves, board):
         """ Find and remove the repeating move """
         if len(self.fen_history) == 2:
-            repeating_move = self._find_repeating_move(winning_evaluated_moves, board)
+            repeating_move = self._find_repeating_move(evaluated_moves, board)
             
             if repeating_move:
-                winning_evaluated_moves.remove(repeating_move)
+                evaluated_moves.remove(repeating_move)
     
     def _find_repeating_move(self, move_evaluations, board):
         repeating_move = None

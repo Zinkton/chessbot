@@ -2,7 +2,7 @@ from constants import NodeState
 import constants
 
 class ChessNode:
-    def __init__(self, move, value, min_value = constants.MAX_VALUE, children = None, parent = None, legal_moves = None, move_index = None):
+    def __init__(self, move, value, min_value = constants.MAX_VALUE, children = None, parent = None, legal_moves = None, move_index = None, noisy = False):
         self.move = move
         self.min_value = min_value
         self.children = children
@@ -13,4 +13,5 @@ class ChessNode:
         self.state = NodeState.UNEXPANDED
         
     def __repr__(self):
-        return '; '.join([self.move, self.min_value, len(self.children), self.parent, self.value, self.state])
+        
+        return '; '.join([str(self.move), str(self.min_value), str(len(self.children)), str(self.value), str(self.state)])

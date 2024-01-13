@@ -15,6 +15,10 @@ class ChessBot():
 
     # Main chess bot logic
     def get_move(self, bot_input):
+        isCasual = bool(bot_input['isCasual'])
+        depth = int(bot_input['depth'])
+        start = perf_counter()
+        
         fen = bot_input['boardFen']
         if constants.OPENING_BOOK:
             move = self.opening_book(fen)
@@ -27,10 +31,12 @@ class ChessBot():
             fen = flip_and_mirror_fen(fen)
 
         board = Board(fen)
-        move = self._select_random_best_move(board)
+        move = self._select_random_best_move(board) if not isCasual else self._select_random_best_move(board, depth)
 
         self._update_fen_history(board, move)
-
+        
+        if isCasual and perf_counter() - start < 2.0:
+            sleep(2.0 - (perf_counter() - start))
         # We want to convert the move back to white's POV
         if is_board_flipped:
             return invert_rank(move)
@@ -42,7 +48,7 @@ class ChessBot():
         moves = data['moves']
         if not moves:
             return None
-        sleep(1)
+        sleep(2)
         moves.sort(key=lambda x: x['draws'] + x['white'] + x['black'], reverse=True)
         return moves[0]['uci']
         # board = Board(fen)
@@ -54,11 +60,11 @@ class ChessBot():
                 
         # return moves[0]['uci']
 
-    def _select_random_best_move(self, board):
+    def _select_random_best_move(self, board, max_depth = constants.MAX_DEPTH):
         unevaluated_moves = [[move, 0] for move in board.legal_moves]
         start = perf_counter()
         best_moves = self._evaluate_and_filter_best_moves(
-            board, unevaluated_moves, constants.MAX_DEPTH)
+            board, unevaluated_moves, max_depth)
         stop = perf_counter()
         print('took %s seconds' % (stop - start))
         

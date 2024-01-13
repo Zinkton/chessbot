@@ -1,6 +1,8 @@
+from typing import List
 import constants
 import random
 import requests
+from saved_values import SavedValues
 from time import perf_counter, sleep
 from utilities import flip_and_mirror_fen, invert_rank
 from evaluation import piece_value
@@ -74,19 +76,53 @@ class ChessBot():
         board.push(move)
         self.fen_history.append(board.board_fen())
 
+    def _combine_saved_values(self, evaluated_moves):
+        saved_values_list = []
+        for evaluated_move in evaluated_moves:
+            saved_values_list.append(evaluated_move[3])
+
+        final_saved_values = SavedValues({}, {})
+        for saved_values in saved_values_list:
+            final_saved_values.value_table.update(saved_values.value_table)
+            final_saved_values.legal_move_table.update(saved_values.legal_move_table)
+        
+        return final_saved_values
+
     def _evaluate_and_filter_best_moves(self, board, unevaluated_moves, max_depth):
         # A board copy to manipulate, depth of search and the move to evaluate
-        solve_position_params = [[board.copy(), max_depth, move] for move, _ in unevaluated_moves]
-        
+        solve_position_params = [[board.copy(), max_depth, move, None, SavedValues({}, {})] for move, _ in unevaluated_moves]
+        start = perf_counter()
+        evaluated_moves = None
         with Pool(processes=constants.PROCESS_COUNT) as p:
             evaluated_moves = p.map(solve_position, solve_position_params)
+        print(f'{perf_counter() - start} finished depth {max_depth}')
+
+        outputs = evaluated_moves
+        while constants.SECONDS_FOR_ITERATIVE_DEEPENING - (perf_counter() - start) > 0 and not any(output[1] < -100000 and output[2].state == constants.NodeState.SOLVED for output in outputs):
+            max_depth += 1
+            evaluated_moves = outputs
+            saved_values = self._combine_saved_values(evaluated_moves)
+            solve_position_params = [[board.copy(), max_depth, move, start, saved_values.clone()] for move, _ in unevaluated_moves]
+            with Pool(processes=constants.PROCESS_COUNT) as p:
+                outputs = p.map(solve_position, solve_position_params)
+            
+            print(f'{perf_counter() - start} finished depth {max_depth}')
+        
+        merged = {}
+        for evaluation_move in evaluated_moves:
+            merged[str(evaluation_move[0])] = evaluation_move
+        
+        for output in outputs:
+            if output[2].state == constants.NodeState.SOLVED and output[2].depth > merged[str(output[0])][2].depth:
+                merged[str(output[0])] = output
+        
+        evaluated_moves = list(merged.values())
 
         #winning_evaluated_moves = self._filter_winning_evaluated_moves(evaluated_moves)
         if len(evaluated_moves) > 1:
             self._remove_repeating_move(evaluated_moves, board)
-            evaluated_moves = evaluated_moves
             
-        best_evaluated_moves = self._filter_best_evaluated_moves(evaluated_moves)
+        best_evaluated_moves = self._filter_best_evaluated_moves(evaluated_moves, max_depth)
         if len(best_evaluated_moves) > 1:
             self._prioritize_promotion_and_capture(best_evaluated_moves, board)
             # Filter again after adjusting scores
@@ -125,9 +161,16 @@ class ChessBot():
             if board.piece_at(move[0].to_square):
                 move[1] -= piece_value[board.piece_at(move[0].to_square).piece_type]
         
-    def _filter_best_evaluated_moves(self, evaluated_moves):
+    def _filter_best_evaluated_moves(self, evaluated_moves, max_depth):
         """ Return only the move evaluations with the best score """
-        best_score = min(evaluated_move[1] for evaluated_move in evaluated_moves)
-        
-        return [evaluated_move
-                for evaluated_move in evaluated_moves if evaluated_move[1] == best_score]
+        max_depth_moves = [evaluated_move for evaluated_move in evaluated_moves if evaluated_move[2].depth == max_depth]
+        best_max_depth_score = min(evaluated_move[1] for evaluated_move in max_depth_moves) if max_depth_moves else None
+        if best_max_depth_score is not None and best_max_depth_score < 0:
+            return [evaluated_move for evaluated_move in max_depth_moves if evaluated_move[1] == best_max_depth_score]
+        else:
+            best_score = min(evaluated_move[1] for evaluated_move in evaluated_moves)
+            if best_max_depth_score is None or best_score < best_max_depth_score:
+                return [evaluated_move
+                        for evaluated_move in evaluated_moves if evaluated_move[1] == best_score]
+            else:
+                return [evaluated_move for evaluated_move in max_depth_moves if evaluated_move[1] == best_max_depth_score]

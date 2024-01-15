@@ -253,7 +253,6 @@ class ZobristHasher:
         # Hash in the turn.
         return self.array[780] if board.turn == chess.WHITE else 0
 
-    @profile
     def __call__(self, board: chess.Board) -> int:
         return (self.hash_board(board) ^ self.hash_castling(board) ^
                 self.hash_ep_square(board) ^ self.hash_turn(board))
@@ -270,7 +269,6 @@ def zobrist_hash(board: chess.Board, *, _hasher: Callable[[chess.Board], int] = 
     """
     return _hasher(board)
 
-@profile
 def update_hash(hash: int, board: chess.Board, move: chess.Move):
     # switch turn
     new_hash = hash ^ POLYGLOT_RANDOM_ARRAY[780]

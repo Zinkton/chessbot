@@ -113,6 +113,10 @@ def _calculate_move_value(move, board):
     if dest_piece:
         # If we capture, add score based on captured piece value and position value
         value += piece_value[dest_piece] + position_value[not board.turn][dest_piece][move.to_square]
+    elif src_piece == chess.PAWN and move.to_square == board.ep_square:
+        down = -8 if board.turn == chess.WHITE else 8
+        capture_square = board.ep_square + down
+        value += piece_value[chess.PAWN] + position_value[not board.turn][chess.PAWN][capture_square]
         
     return value
 

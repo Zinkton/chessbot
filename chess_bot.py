@@ -51,14 +51,6 @@ class ChessBot():
         sleep(2)
         moves.sort(key=lambda x: x['draws'] + x['white'] + x['black'], reverse=True)
         return moves[0]['uci']
-        # board = Board(fen)
-        # for move in moves:
-        #     if board.turn and move['white'] > move['black']:
-        #         return move['uci']
-        #     if not board.turn and move['black'] > move['white']:
-        #         return move['uci']
-                
-        # return moves[0]['uci']
 
     def _select_random_best_move(self, board, max_depth = constants.MAX_DEPTH):
         unevaluated_moves = [[move, 0] for move in board.legal_moves]

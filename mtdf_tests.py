@@ -2,7 +2,6 @@
 import time
 import chess
 from mtdf import solve_position_root
-from sss_algorithm import solve_position
 from constants import MAX_VALUE
 
 
@@ -10,10 +9,10 @@ def checkmate_in_one():
     for depth in range(1, 7):
         board = chess.Board('4k3/Q7/5P2/8/8/5p2/q7/4K3 w - - 0 1')
         result = solve_position_root(board, depth)
-        assert result[0][0] == chess.Move.from_uci('a7e7') and result[0][1] == MAX_VALUE + depth - 1
+        assert result[0][0] == chess.Move.from_uci('a7e7') and result[0][1] == MAX_VALUE
         board = chess.Board('4k3/Q7/5P2/8/8/5p2/q7/4K3 b - - 0 1')
         result = solve_position_root(board, depth)
-        assert result[0][0] == chess.Move.from_uci('a2e2') and result[0][1] == MAX_VALUE + depth - 1
+        assert result[0][0] == chess.Move.from_uci('a2e2') and result[0][1] == MAX_VALUE
 
 def checkmated_in_one():
     for depth in range(2, 7):
@@ -28,10 +27,10 @@ def checkmate_in_two():
     for depth in range(3, 7):
         board = chess.Board('7k/8/RR6/8/8/8/8/4K3 w - - 0 1')
         result = solve_position_root(board, depth)
-        assert (result[0][0] == chess.Move.from_uci('a6a7') or result[0][0] == chess.Move.from_uci('b6b7')) and result[0][1] == MAX_VALUE + depth - 3
+        assert (result[0][0] == chess.Move.from_uci('a6a7') or result[0][0] == chess.Move.from_uci('b6b7')) and result[0][1] == MAX_VALUE
         board = chess.Board('7k/8/8/8/8/rr6/8/7K b - - 0 1')
         result = solve_position_root(board, depth)
-        assert (result[0][0] == chess.Move.from_uci('a3a2') or result[0][0] == chess.Move.from_uci('b3b2')) and result[0][1] == MAX_VALUE + depth - 3
+        assert (result[0][0] == chess.Move.from_uci('a3a2') or result[0][0] == chess.Move.from_uci('b3b2')) and result[0][1] == MAX_VALUE
 
 def checkmated_in_two():
     for depth in range(4, 7):

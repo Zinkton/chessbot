@@ -22,13 +22,13 @@ from evaluation import calculate_move_value, evaluate_board
 pos_table = {}
 killer_table = {}
 
-def solve_position_root(board: chess.Board, fixed_depth: Optional[int] = None):
+def solve_position_root(board: chess.Board, max_depth: Optional[int] = 100):
     global pos_table
     global killer_table
     # fixed_depth = 6
     # initial_score = evaluate_board(board) if board.turn else -evaluate_board(board)
     root_node = MtdfNode(move=None, value=0, children=[], gamma=0, hash=zobrist_hash(board))
-    (depth, move_scores) = _iterative_deepening(root_node, board, pos_table, killer_table, fixed_depth)
+    (depth, move_scores) = _iterative_deepening(root_node, board, pos_table, killer_table, max_depth)
     # root_node.print_children()
     # current = [child for child in root_node.children if child.gamma == root_node.gamma][0]
     # print(current)
@@ -46,16 +46,12 @@ def solve_position_root(board: chess.Board, fixed_depth: Optional[int] = None):
     print(f'depth: {depth}')
     return [best_moves[0]]
 
-def _iterative_deepening(root: MtdfNode, board: chess.Board, pos_table: Dict[int, Tuple[int, int, int, bool]], killer_table: Dict[int, chess.Move], fixed_depth: Optional[int] = None) -> Tuple[int, List[Tuple[chess.Move, int]]]:
+def _iterative_deepening(root: MtdfNode, board: chess.Board, pos_table: Dict[int, Tuple[int, int, int, bool]], killer_table: Dict[int, chess.Move], max_depth: Optional[int]) -> Tuple[int, List[Tuple[chess.Move, int]]]:
     start = time.perf_counter()
-    min_depth = MIN_DEPTH if not fixed_depth else fixed_depth
-    max_depth = 100 if not fixed_depth else fixed_depth
-    for depth in range(1, min_depth + 1):
-        _mtdf(root, depth, board, pos_table, killer_table)
-    
-    result = (min_depth, [(child.move, child.gamma) for child in root.children])
-    for depth in range(min_depth + 1, max_depth + 1):
-        if _mtdf(root, depth, board, pos_table, killer_table, start):
+    _mtdf(root, 1, board, pos_table, killer_table)
+    result = (1, [(child.move, child.gamma) for child in root.children])
+    for depth in range(2, max_depth + 1):
+        if abs(root.gamma) < MAX_VALUE and _mtdf(root, depth, board, pos_table, killer_table, start):
             result = (depth, [(child.move, child.gamma) for child in root.children])
         else:
             break
@@ -66,7 +62,6 @@ def _mtdf(root: MtdfNode, depth: int, board: chess.Board, pos_table: Dict[int, T
     pos_result = pos_table.get(root.hash, None)
     if pos_result is not None and pos_result[0] >= depth + 1 and pos_result[2] == constants.EXACT:
         root.gamma = pos_result[1] if board.turn else -pos_result[1]
-        return True
     
     upper_bound = MAX_VALUE + depth
     lower_bound = -MAX_VALUE - depth

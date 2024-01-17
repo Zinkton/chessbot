@@ -1,4 +1,5 @@
 import chess
+from constants import MAX_VALUE
 
 # Piece values
 piece_value = {
@@ -7,7 +8,7 @@ piece_value = {
     chess.BISHOP: 320,
     chess.ROOK: 479,
     chess.QUEEN: 929,
-    chess.KING: 60000
+    chess.KING: MAX_VALUE
 }
 
 # Position tables for each piece type
@@ -89,3 +90,48 @@ position_value = {
 
 K_CASTLING_VALUE = position_value[chess.WHITE][chess.ROOK][chess.F1] - position_value[chess.WHITE][chess.ROOK][chess.H1] + position_value[chess.WHITE][chess.KING][chess.G1] - position_value[chess.WHITE][chess.KING][chess.E1]
 Q_CASTLING_VALUE = position_value[chess.WHITE][chess.ROOK][chess.D1] - position_value[chess.WHITE][chess.ROOK][chess.A1] + position_value[chess.WHITE][chess.KING][chess.C1] - position_value[chess.WHITE][chess.KING][chess.E1]
+
+def calculate_move_value(move: chess.Move, board: chess.Board):
+    castle_value = _check_castling(board, move)
+    if castle_value is not None:
+        return castle_value
+    
+    value = 0
+    src_piece = board.piece_type_at(move.from_square)
+    dest_piece = board.piece_type_at(move.to_square)
+    
+    if move.promotion:
+        prom = move.promotion
+        pos_score = position_value[board.turn][prom][move.to_square] - position_value[board.turn][src_piece][move.from_square]
+        prom_score = piece_value[prom] - piece_value[src_piece]
+        value = pos_score + prom_score
+    else:
+        value = position_value[board.turn][src_piece][move.to_square] - position_value[board.turn][src_piece][move.from_square]
+
+    if dest_piece:
+        # If we capture, add score based on captured piece value and position value
+        value += piece_value[dest_piece] + position_value[not board.turn][dest_piece][move.to_square]
+    elif src_piece == chess.PAWN and move.to_square == board.ep_square:
+        down = -8 if board.turn == chess.WHITE else 8
+        capture_square = board.ep_square + down
+        value += piece_value[chess.PAWN] + position_value[not board.turn][chess.PAWN][capture_square]
+        
+    return value
+
+def _check_castling(board: chess.Board, move: chess.Move):
+    if board.kings & chess.BB_SQUARES[move.from_square]:
+        diff = chess.square_file(move.from_square) - chess.square_file(move.to_square)
+        if abs(diff) > 1:
+            return K_CASTLING_VALUE if diff < 0 else Q_CASTLING_VALUE
+        
+    return None
+
+def evaluate_board(board: chess.Board):
+    score = 0
+    for square in range(64):
+        piece = board.piece_at(square)
+        if piece and piece.piece_type != chess.KING:
+            sign = 1 if piece.color else -1
+            score += (piece_value[piece.piece_type] + position_value[piece.color][piece.piece_type][square]) * sign
+    
+    return score

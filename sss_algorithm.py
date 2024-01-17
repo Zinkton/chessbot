@@ -1,6 +1,6 @@
 import chess
 import evaluation
-from constants import NodeState
+from constants import NodeState, MAX_VALUE
 from evaluation import piece_value, position_value
 from chess_node import ChessNode
 
@@ -38,13 +38,13 @@ def _is_leaf_node(node: ChessNode, board, depth, max_depth):
         return depth >= max_depth or board.is_checkmate()
         
     if board.is_checkmate():
-        value = -10**10 - (max_depth - depth) if board.turn else 10**10 + (max_depth - depth)
+        value = -MAX_VALUE - (max_depth - depth) if board.turn else MAX_VALUE + (max_depth - depth)
         return (True, value)
     elif depth >= max_depth:
         return (True, node.value)
     return (False, 0)
 
-def _expand_node(node: ChessNode, board, depth, max_depth):
+def _expand_node(node: ChessNode, board: chess.Board, depth, max_depth):
     node.state = NodeState.LIVE
     legal_moves = list(board.legal_moves)
     if not legal_moves:

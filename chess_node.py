@@ -19,7 +19,7 @@ class ChessNode:
         return '; '.join([str(self.move), str(self.min_value), str(len(self.children)), str(self.value), str(self.state)])
     
 class MtdfNode:
-    def __init__(self, move: Optional[chess.Move], value: int, children: Dict[chess.Move, "MtdfNode"] = None, parent: "MtdfNode" = None, gamma: Optional[int] = None, move_generator: Iterator[Tuple[chess.Move, int]] = None, hash: int = 0, sorted_children_keys: List[int] = None):
+    def __init__(self, move: Optional[chess.Move], value: int, children: Dict[chess.Move, "MtdfNode"] = None, parent: "MtdfNode" = None, gamma: Optional[int] = None, move_generator: Iterator[Tuple[chess.Move, int]] = None, hash: int = 0, sorted_children_keys: List[int] = None, killer_move: Optional[chess.Move] = None):
         self.move = move
         self.children = children
         self.parent = parent
@@ -28,6 +28,7 @@ class MtdfNode:
         self.move_generator = move_generator
         self.hash = hash
         self.sorted_children_keys = sorted_children_keys
+        self.killer_move = killer_move
         
     def print_children(self):
         for child in self.children:

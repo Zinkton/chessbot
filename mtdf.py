@@ -147,10 +147,11 @@ def _alpha_beta(node: MtdfNode, alpha: int, beta: int, depth_left: int, board: c
     killer_move = killer_table.get(node.hash, None)
     if killer_move:
         killer_child = node.children.get(killer_move, None)
-        if killer_child is None:
+        killer_child_found = killer_child is not None
+        if not killer_child_found:
             child_hash = update_hash(node.hash, board, killer_move)
             move_value = calculate_move_value(killer_move, board)
-            killer_child = MtdfNode(move=killer_move, value=move_value - node.value, parent=node, children={}, hash=child_hash, sorted_children_keys=[])
+            killer_child = MtdfNode(move=killer_move, value=move_value - node.value, parent=node, children={}, hash=child_hash, sorted_children_keys=[], killer_move=killer_move)
             node.children[killer_move] = killer_child
             node.sorted_children_keys.insert(0, killer_move)
 
@@ -210,21 +211,180 @@ def _quiescence(node: MtdfNode, alpha: int, beta: int, board: chess.Board) -> in
     #     return -node.value
 # @profile
 def _generate_ordered_moves(board: chess.Board, node: MtdfNode) -> Iterator[Tuple[chess.Move, int]]:
-    sorted_moves = _sorted_evaluated_legal_moves(board, board.legal_moves)
+    sorted_moves = _generate_ordered_legal_moves(board)
+    # sorted_moves = _sorted_evaluated_legal_moves(board)
 
     for move in sorted_moves:
+        if node.killer_move is not None and node.killer_move == move:
+            node.killer_move = None
+            continue
         child_hash = update_hash(node.hash, board, move[0])
         child = MtdfNode(move=move[0], value=move[1] - node.value, parent=node, children={}, hash=child_hash, sorted_children_keys=[])
         node.children[move[0]] = child
         node.sorted_children_keys.append(move[0])
         
         yield child
+        
 # @profile
-def _sorted_evaluated_legal_moves(board: chess.Board, legal_moves: Iterator[chess.Move]) -> List[Tuple[chess.Move, int]]:
-    evaluated_legal_moves = [[move, calculate_move_value(move, board)] for move in legal_moves]
+def _sorted_evaluated_legal_moves(board: chess.Board) -> List[Tuple[chess.Move, int]]:
+    evaluated_legal_moves = [[move, calculate_move_value(move, board)] for move in board.legal_moves]
     evaluated_legal_moves.sort(key=lambda x: x[1], reverse=True)
     
     return evaluated_legal_moves
+
+def _generate_ordered_legal_moves(board: chess.Board) -> Iterator[Tuple[chess.Move, int]]:
+    king_mask = board.kings & board.occupied_co[board.turn]
+    king = chess.msb(king_mask)
+    blockers = board._slider_blockers(king)
+    checkers = board.attackers_mask(not board.turn, king)
+    if checkers:
+        # In check, return all possible moves that escape check
+        for move in _generate_ordered_evasions(king, checkers, board):
+            if board._is_safe(king, blockers, move):
+                yield (move, calculate_move_value(move, board))
+        # TEST get all moves and then order them by _calculate_move_value
+        # all_evasions = [(move, calculate_move_value(move, board)) for move in board._generate_evasions(board, king, checkers) if board._is_safe(king, blockers, move)]
+        # all_evasions.sort(key=lambda x: x[1], reverse=True)
+        # for item in all_evasions:
+        #     yield item
+    else:
+        for move in _generate_ordered_pseudo_legal_moves(board):
+            if board._is_safe(king, blockers, move):
+                yield (move, calculate_move_value(move, board))
+
+def _generate_ordered_evasions(king: chess.Square, checkers: chess.Bitboard, board: chess.Board) -> Iterator[chess.Move]:
+    from_mask = chess.BB_ALL
+    to_mask = chess.BB_ALL
+
+    sliders = checkers & (board.bishops | board.rooks | board.queens)
+
+    checker = chess.msb(checkers)
+    single_checker = chess.BB_SQUARES[checker] == checkers
+    if single_checker:
+        # Capture a single checker.
+        target = checkers
+        
+        yield from board.generate_pseudo_legal_moves(~board.kings & from_mask, target & to_mask)
+
+        # Capture the checking pawn en passant (but avoid yielding
+        # duplicate moves).
+        if board.ep_square and not chess.BB_SQUARES[board.ep_square] & target:
+            last_double = board.ep_square + (-8 if board.turn == chess.WHITE else 8)
+            if last_double == checker:
+                yield from board.generate_pseudo_legal_ep(from_mask, to_mask)
+
+    attacked = 0
+    for checker in chess.scan_reversed(sliders):
+        attacked |= chess.ray(king, checker) & ~chess.BB_SQUARES[checker]
+
+    # King moves that are captures
+    for to_square in chess.scan_reversed(chess.BB_KING_ATTACKS[king] & board.occupied_co[not board.turn] & ~attacked & to_mask):
+        yield chess.Move(king, to_square)
+
+    if single_checker:
+        # Block a single checker
+        target = chess.between(king, checker)
+
+        yield from board.generate_pseudo_legal_moves(~board.kings & from_mask, target & to_mask)
+
+    # King moves that are not captures
+    for to_square in chess.scan_reversed(chess.BB_KING_ATTACKS[king] & ~board.occupied & ~attacked & to_mask):
+        yield chess.Move(king, to_square)
+
+def _generate_ordered_pseudo_legal_moves(board: chess.Board):
+    from_mask = chess.BB_ALL
+    to_mask = chess.BB_ALL
+
+    promotion_pawns = board.pawns & board.occupied_co[board.turn] & from_mask & (chess.BB_RANK_7 if board.turn else chess.BB_RANK_2)
+    if promotion_pawns:
+        # Generate pawn captures.
+        capturers = promotion_pawns
+        for from_square in chess.scan_reversed(capturers):
+            targets = (
+                chess.BB_PAWN_ATTACKS[board.turn][from_square] &
+                board.occupied_co[not board.turn] & to_mask)
+
+            for to_square in chess.scan_reversed(targets):
+                yield chess.Move(from_square, to_square, chess.QUEEN)
+                # Try comment the rook/bishop/knight?
+                # yield chess.Move(from_square, to_square, chess.ROOK)
+                # yield chess.Move(from_square, to_square, chess.BISHOP)
+                # yield chess.Move(from_square, to_square, chess.KNIGHT)
+
+        # Prepare pawn advance generation.
+        if board.turn == chess.WHITE:
+            single_moves = promotion_pawns << 8 & ~board.occupied
+        else:
+            single_moves = promotion_pawns >> 8 & ~board.occupied
+
+        single_moves &= to_mask
+        # Generate single pawn moves.
+        for to_square in chess.scan_reversed(single_moves):
+            from_square = to_square + (8 if board.turn == chess.BLACK else -8)
+            yield chess.Move(from_square, to_square, chess.QUEEN)
+            # yield chess.Move(from_square, to_square, chess.ROOK)
+            # yield chess.Move(from_square, to_square, chess.BISHOP)
+            # yield chess.Move(from_square, to_square, chess.KNIGHT)
+    
+    pawns = board.pawns & board.occupied_co[board.turn] & from_mask & (~chess.BB_RANK_7 if board.turn else ~chess.BB_RANK_2)
+    if pawns:
+        # Generate pawn captures.
+        capturers = pawns
+        for from_square in chess.scan_reversed(capturers):
+            targets = (
+                chess.BB_PAWN_ATTACKS[board.turn][from_square] &
+                board.occupied_co[not board.turn] & to_mask)
+
+            for to_square in chess.scan_reversed(targets):
+                yield chess.Move(from_square, to_square)
+        
+        # Generate en passant captures.
+        if board.ep_square:
+            yield from board.generate_pseudo_legal_ep(from_mask, to_mask)
+
+    our_pieces = board.occupied_co[board.turn]
+    enemy_pieces = board.occupied_co[not board.turn]
+
+    # Generate piece captures
+    non_pawns = our_pieces & ~board.pawns & from_mask
+    saved_attacks = {}
+    for from_square in chess.scan_reversed(non_pawns):
+        attacks = board.attacks_mask(from_square)
+        saved_attacks[from_square] = attacks
+        moves = attacks & enemy_pieces & to_mask
+        for to_square in chess.scan_reversed(moves):
+            yield chess.Move(from_square, to_square)
+    
+    # Generate castling moves.
+    yield from board.generate_castling_moves(from_mask, to_mask)
+
+    # Generate piece non-capture moves
+    for from_square in saved_attacks:
+        moves = saved_attacks[from_square] & ~board.occupied & to_mask
+        for to_square in chess.scan_reversed(moves):
+            yield chess.Move(from_square, to_square)
+
+    if pawns:
+        # Prepare pawn advance generation.
+        if board.turn == chess.WHITE:
+            single_moves = pawns << 8 & ~board.occupied
+            double_moves = single_moves << 8 & ~board.occupied & (chess.BB_RANK_3 | chess.BB_RANK_4)
+        else:
+            single_moves = pawns >> 8 & ~board.occupied
+            double_moves = single_moves >> 8 & ~board.occupied & (chess.BB_RANK_6 | chess.BB_RANK_5)
+
+        double_moves &= to_mask
+        # Generate double pawn moves.
+        for to_square in chess.scan_reversed(double_moves):
+            from_square = to_square + (16 if board.turn == chess.BLACK else -16)
+            yield chess.Move(from_square, to_square)
+
+        single_moves &= to_mask
+        # Generate single pawn moves.
+        for to_square in chess.scan_reversed(single_moves):
+            from_square = to_square + (8 if board.turn == chess.BLACK else -8)
+            yield chess.Move(from_square, to_square)
+
 
 def _save_score(pos_table: Dict[int, Tuple[int, int, int, bool]], depth_left: int, turn: bool, node_type: int, saved_value: int, child: MtdfNode, score: int):
     if not saved_value or saved_value and saved_value[0] < depth_left:

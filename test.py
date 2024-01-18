@@ -1,4 +1,6 @@
+from typing import Dict, List
 import chess, random, time
+from chess_node import MtdfNode
 from zobrist import zobrist_hash, update_hash
 from evaluation import evaluate_board
 
@@ -28,6 +30,24 @@ from evaluation import evaluate_board
 #     print(f'success, update: {total_update}, full: {total_full}')
 
 # test_zobrist()
+@profile
+def test_dict_vs_list():
+    board = chess.Board()
+    print(evaluate_board(board))
 
-board = chess.Board()
-print(evaluate_board(board))
+    dictionary: Dict[chess.Move, MtdfNode] = {}
+    list_obj: List[MtdfNode] = []
+
+    legal_moves = list(board.legal_moves)
+    for move in legal_moves:
+        node = MtdfNode(move=move, value=0, children=[])
+        dictionary[move] = node
+        list_obj.append(node)
+
+    legal_moves_len = len(legal_moves)
+    for x in range(1000):
+        the_move = dictionary[legal_moves[x % legal_moves_len]]
+        children_enumeration = enumerate(list_obj)
+        (index, the_move_list) = next(((index, child) for (index, child) in children_enumeration if child.move == legal_moves[x % legal_moves_len]), (None, None))
+
+test_dict_vs_list()

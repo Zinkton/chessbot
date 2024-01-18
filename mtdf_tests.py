@@ -80,9 +80,11 @@ def capture_in_two():
         assert result[0][0] == chess.Move.from_uci('d4c2')
 
 def queen_sack():
+    start = time.perf_counter()
     board = chess.Board('rnb1k1nr/2p3pp/p1qp1p2/1pbN4/1PQ1P3/3B1N2/P1P2PPP/R1B2K1R w kq - 0 11')
     result = solve_position_root(board, 6)
     assert result[0][0] != chess.Move.from_uci('c4c5')
+    print(time.perf_counter() - start)
 
 def performance_test():
     board = chess.Board()

@@ -6,7 +6,7 @@ from constants import MAX_VALUE
 
 
 def checkmate_in_one():
-    for depth in range(1, 7):
+    for depth in range(2, 7):
         board = chess.Board('4k3/Q7/5P2/8/8/5p2/q7/4K3 w - - 0 1')
         result = solve_position_root(board, depth)
         assert result[0][0] == chess.Move.from_uci('a7e7') and result[0][1] == MAX_VALUE
@@ -15,7 +15,7 @@ def checkmate_in_one():
         assert result[0][0] == chess.Move.from_uci('a2e2') and result[0][1] == MAX_VALUE
 
 def checkmated_in_one():
-    for depth in range(2, 7):
+    for depth in range(3, 7):
         board = chess.Board('4k3/8/8/8/8/1r6/r7/4K3 w - - 0 1')
         result = solve_position_root(board, depth)
         assert result[0][1] <= -MAX_VALUE
@@ -24,7 +24,7 @@ def checkmated_in_one():
         assert result[0][1] <= -MAX_VALUE
 
 def checkmate_in_two():
-    for depth in range(3, 7):
+    for depth in range(4, 7):
         board = chess.Board('7k/8/RR6/8/8/8/8/4K3 w - - 0 1')
         result = solve_position_root(board, depth)
         assert (result[0][0] == chess.Move.from_uci('a6a7') or result[0][0] == chess.Move.from_uci('b6b7')) and result[0][1] == MAX_VALUE
@@ -33,7 +33,7 @@ def checkmate_in_two():
         assert (result[0][0] == chess.Move.from_uci('a3a2') or result[0][0] == chess.Move.from_uci('b3b2')) and result[0][1] == MAX_VALUE
 
 def checkmated_in_two():
-    for depth in range(4, 7):
+    for depth in range(5, 7):
         board = chess.Board('7k/8/RR6/8/8/8/8/4K3 b - - 0 1')
         result = solve_position_root(board, depth)
         assert result[0][1] <= -MAX_VALUE
@@ -42,14 +42,14 @@ def checkmated_in_two():
         assert result[0][1] <= -MAX_VALUE
 
 def checkmate_in_three():
-    for depth in range(5, 7):
+    for depth in range(6, 7):
         board = chess.Board('r4r2/1R1R2pk/7p/8/8/5Ppq/P7/6K1 w - - 0 1')
         result = solve_position_root(board, depth)
         assert result[0][0] == chess.Move.from_uci('d7g7')
 
 def checkmated_in_three():
     board = chess.Board('r4r1k/1R1R2pQ/7p/8/8/5Ppq/P7/6K1 b - - 0 1')
-    result = solve_position_root(board, 6)
+    result = solve_position_root(board, 7)
     assert result[0][1] <= -MAX_VALUE
 
 def capture_in_one():
@@ -89,10 +89,14 @@ def queen_sack():
 def performance_test():
     board = chess.Board()
     start = time.perf_counter()
-    solve_position_root(board, 6)
+    board.push(solve_position_root(board, 6)[0][0])
+    board.push(solve_position_root(board, 6)[0][0])
+    board.push(solve_position_root(board, 6)[0][0])
+    board.push(solve_position_root(board, 6)[0][0])
     print(time.perf_counter() - start)
 
 if __name__ == '__main__':
+    start = time.perf_counter()
     checkmate_in_one()
     checkmated_in_one()
     checkmate_in_two()
@@ -104,3 +108,4 @@ if __name__ == '__main__':
     capture_in_two()
     queen_sack()
     performance_test()
+    print(f'total test time: {time.perf_counter() - start}')

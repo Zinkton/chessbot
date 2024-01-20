@@ -11,7 +11,7 @@ def sorted_child_generator(node: MtdfNode):
         
 # @profile
 def is_checkmate(board: chess.Board) -> bool:
-    if not _is_check(board):
+    if not is_check(board):
         return False
     
     return not any(board.generate_legal_moves())
@@ -20,7 +20,7 @@ def _checkers_mask(board: chess.Board) -> chess.Bitboard:
     king = _king(board, board.turn)
     return board.attackers_mask(not board.turn, king)
 
-def _is_check(board: chess.Board()) -> bool:
+def is_check(board: chess.Board()) -> bool:
     return bool(_checkers_mask(board))
 
 def _king(board: chess.Board, color: chess.Color) -> chess.Square:

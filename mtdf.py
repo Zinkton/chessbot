@@ -2,14 +2,14 @@ import itertools
 import time
 from typing import Dict, List, Optional, Tuple
 
-import chess
+import custom_chess as chess
 
 import constants
 from chess_node import MtdfNode
 from constants import MAX_VALUE, SECONDS_PER_MOVE
-from move_generation import _is_check, generate_ordered_moves, is_checkmate, sorted_child_generator
+from move_generation import is_check, generate_ordered_moves, is_checkmate, sorted_child_generator
 from zobrist import update_hash, zobrist_hash
-from evaluation import calculate_move_value
+from evaluation import calculate_move_value, evaluate_board
 
 # def solve_position(input):
 #     (board, time, move) = (input[0], input[1], input[2])
@@ -22,13 +22,13 @@ from evaluation import calculate_move_value
 
 pos_table = {}
 killer_table = {}
-
 def solve_position_root(board: chess.Board, max_depth: Optional[int] = 100):
     global pos_table
     global killer_table
     # fixed_depth = 6
     # initial_score = evaluate_board(board) if board.turn else -evaluate_board(board)
-    root_node = MtdfNode(move=None, value=0, children={}, hash=zobrist_hash(board), sorted_children_keys=[])
+    initial_value = evaluate_board(board) if board.turn else -evaluate_board(board)
+    root_node = MtdfNode(move=None, value=initial_value, children={}, hash=zobrist_hash(board), sorted_children_keys=[])
     (depth, move_scores) = _iterative_deepening(root_node, board, pos_table, killer_table, max_depth)
     # root_node.print_children()
     # current = [child for child in root_node.children if child.gamma == root_node.gamma][0]
@@ -66,7 +66,7 @@ def _mtdf(root: MtdfNode, depth: int, board: chess.Board, pos_table: Dict[int, T
         if pos_result is not None and pos_result[2] == constants.EXACT:
             root.gamma = pos_result[1] if board.turn else -pos_result[1]
         else:
-            root.gamma = 0
+            root.gamma = root.value
     
     upper_bound = MAX_VALUE + depth
     lower_bound = -MAX_VALUE - depth
@@ -86,7 +86,6 @@ def _mtdf(root: MtdfNode, depth: int, board: chess.Board, pos_table: Dict[int, T
             lower_bound = root.gamma
     
     _save_score(pos_table, depth + 1, board.turn, constants.EXACT, pos_result, root, root.gamma)
-    pos_table[root.hash] = (depth + 1, root.gamma if board.turn else -root.gamma, constants.EXACT)
 
     return True
 
@@ -100,6 +99,7 @@ def _evaluate_child(child: MtdfNode, depth_left: int, alpha: int, beta: int, pos
         _, saved_score, node_type = saved_value
         saved_score = saved_score if board.turn else -saved_score
         # print(f'move: {child.move} depth_left: {depth_left}, saved_depth: {saved_value[0]}, alpha: {alpha}, beta: {beta}, saved_score: {saved_score}, saved_type: {node_type}')
+        
         if node_type == constants.EXACT:
             score = saved_score
         elif node_type == constants.LOWERBOUND and saved_score > alpha:
@@ -185,8 +185,8 @@ def _alpha_beta(node: MtdfNode, alpha: int, beta: int, depth_left: int, board: c
             return (child.move, score) # fail-soft beta-cutoff
 
     if not node.children:
-        if _is_check(board):
-            return (None, -(MAX_VALUE + depth_left))
+        if is_check(board):
+            return (None, -(MAX_VALUE + depth_left - 1))
         else:
             return (None, 0)
 
@@ -196,10 +196,11 @@ def _alpha_beta(node: MtdfNode, alpha: int, beta: int, depth_left: int, board: c
 
 # @profile
 def _quiescence(node: MtdfNode, alpha: int, beta: int, board: chess.Board) -> int:
-    if is_checkmate(board):
-        return -MAX_VALUE
-    else:
-        return -node.value
+    return -node.value
+    # if is_checkmate(board):
+    #     return -MAX_VALUE
+    # else:
+    #     return -node.value
     # any_legal_moves = any(board.generate_legal_moves())
     # if not any_legal_moves:
     #     if board.is_check():

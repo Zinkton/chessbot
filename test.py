@@ -1,53 +1,105 @@
-from typing import Dict, List
+import ctypes
+import multiprocessing
+from multiprocessing import shared_memory
+from typing import Dict, List, Optional
 import chess, random, time
+import custom_chess
+import numpy as np
+import constants
 from chess_node import MtdfNode
 from zobrist import zobrist_hash, update_hash
 from evaluation import evaluate_board
 
-# @profile
-# def test_zobrist():
-#     total_update = 0.0
-#     total_full = 0.0
+# def worker_function(args):
+#     shared_memory_name, index = args
+#     existing_shm = shared_memory.SharedMemory(name=shared_memory_name)
+#     shared_array = np.ndarray((constants.PROCESS_COUNT,), dtype=np.uint64, buffer=existing_shm.buf)
+#     shared_array[index] = index # Example operation
+#     value = shared_array[index]
+#     existing_shm.close()  # Close the shared memory block reference
+#     some_list = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+#     print(some_list[value*2])
+#     return value
 
-#     for x in range(100):
-#         board = chess.Board()
-#         updateable_hash = zobrist_hash(board)
-#         move_stack = []
-#         while True:
-#             move = random.choice(list(board.legal_moves))
-#             updateable_hash = update_hash(updateable_hash, board, move)
-#             move_stack.append(board.san(move))
-#             board.push(move)
-#             expected_hash = zobrist_hash(board)
-#             if updateable_hash != expected_hash:
-#                 print(board)
-#                 print(' '.join(move_stack))
-#                 print(move)
-#                 raise Exception('failure')
-#             if board.outcome():
-#                 break
+# def main():
 
-#     print(f'success, update: {total_update}, full: {total_full}')
+#     shm = shared_memory.SharedMemory(create=True, size=constants.PROCESS_COUNT*np.uint64().itemsize)
+#     try:
+#         # Create shared memory
+#         shared_array = np.ndarray((constants.PROCESS_COUNT,), dtype=np.uint64, buffer=shm.buf)
+#         shared_array.fill(0)  # Initialize the array with zeros
 
-# test_zobrist()
-@profile
-def test_dict_vs_list():
-    board = chess.Board()
-    print(evaluate_board(board))
+#         inputs = [(shm.name, i) for i in range(constants.PROCESS_COUNT)]
+        
+        
+#         with multiprocessing.Pool(processes=constants.PROCESS_COUNT) as pool:
+#             results = pool.map(worker_function, inputs)
+        
+#     finally:
+#         # Clean up
+#         shm.close()
+#         shm.unlink()
 
-    dictionary: Dict[chess.Move, MtdfNode] = {}
-    list_obj: List[MtdfNode] = []
+#     print(results)
 
-    legal_moves = list(board.legal_moves)
-    for move in legal_moves:
-        node = MtdfNode(move=move, value=0, children=[])
-        dictionary[move] = node
-        list_obj.append(node)
+# if __name__ == '__main__':
+#     number = np.uint64()
+#     main()
 
-    legal_moves_len = len(legal_moves)
-    for x in range(1000):
-        the_move = dictionary[legal_moves[x % legal_moves_len]]
-        children_enumeration = enumerate(list_obj)
-        (index, the_move_list) = next(((index, child) for (index, child) in children_enumeration if child.move == legal_moves[x % legal_moves_len]), (None, None))
+# test_array = np.ndarray((5,), dtype=np.uint64)
+# test_array.fill(5)
+# some_list = [0, 1, 2, 3, 4, 5]
+# print(some_list[test_array[4]])
 
-test_dict_vs_list()
+# def pack_values(d, s, t):
+#     # Ensure the values are within their ranges
+#     assert 0 <= d <= 63
+#     assert -1048576 <= s <= 1048576
+#     assert 0 <= t <= 2
+
+#     # Convert s to a 21-bit representation
+#     s = s & 0x1FFFFF  # 21 bits mask
+
+#     # Pack the values
+#     packed_value = d | (s << 6) | (t << 27)
+#     return packed_value
+
+# def unpack_values(packed_value):
+#     # Unpack the values
+#     d = packed_value & 0b111111  # 6 bits for d
+#     s = (packed_value >> 6) & 0x1FFFFF  # 21 bits for s
+#     t = (packed_value >> 27) & 0b11  # 2 bits for t
+
+#     # Adjust s for two's complement representation of negative values
+#     if s >= 0x100000:  # Check if the sign bit is set (21st bit)
+#         s -= 0x200000  # Convert back from two's complement
+
+#     return d, s, t
+
+# # Example usage
+# packed = pack_values(45, -500000, 2)  # Example values for d, s, t
+# d, s, t = unpack_values(packed)
+# print(f"Packed value: {packed}")
+# print(f"Unpacked values: d = {d}, s = {s}, t = {t}")
+
+
+
+for x in range(100):
+    custom_board = custom_chess.Board()
+    real_board = chess.Board()
+    while True:
+        move = random.choice(list(custom_board.generate_legal_moves()))
+        custom_board.push(move)
+        real_board.push(move)
+        if zobrist_hash(custom_board) != zobrist_hash(real_board):
+            print(custom_board)
+            print(real_board)
+            raise Exception("lol")
+            
+        if real_board.outcome():
+            break
+    while real_board.move_stack:
+        custom_board.pop()
+        real_board.pop()
+        assert zobrist_hash(custom_board) == zobrist_hash(real_board)
+        

@@ -1468,8 +1468,8 @@ class _BoardState(Generic[BoardT]):
         board.turn = self.turn
         board.castling_rights = self.castling_rights
         board.ep_square = self.ep_square
-        # board.halfmove_clock = self.halfmove_clock
-        # board.fullmove_number = self.fullmove_number
+        board.halfmove_clock = self.halfmove_clock
+        board.fullmove_number = self.fullmove_number
 
 class Board(BaseBoard):
     """
@@ -1867,7 +1867,7 @@ class Board(BaseBoard):
 
         # Handle castling.
         if piece == KING:
-            move = self._from_chess960(self.chess960, move.from_square, move.to_square)
+            move = self._from_chess960(move.from_square, move.to_square)
             if move in self.generate_castling_moves():
                 return True
 
@@ -2221,10 +2221,10 @@ class Board(BaseBoard):
             a null move.
         """
         # Push move and remember board state.
+        move = self._to_chess960(move)
         board_state = self._board_state()
         self.castling_rights = self.clean_castling_rights()  # Before pushing stack
-        # self.move_stack.append(self._from_chess960(move.from_square, move.to_square, move.promotion))
-        self.move_stack.append(move)
+        self.move_stack.append(self._from_chess960(move.from_square, move.to_square, move.promotion))
         self._stack.append(board_state)
 
         # Reset en passant square.
@@ -2283,6 +2283,7 @@ class Board(BaseBoard):
                 captured_piece_type = self._remove_piece_at(capture_square)
 
         # Promotion.
+        promoted = False
         if move.promotion:
             promoted = True
             piece_type = move.promotion
@@ -2347,7 +2348,7 @@ class Board(BaseBoard):
         if promotion is None and self.pawns & BB_SQUARES[from_square] and BB_SQUARES[to_square] & BB_BACKRANKS:
             promotion = QUEEN
 
-        move = self._from_chess960(self.chess960, from_square, to_square, promotion)
+        move = self._from_chess960(from_square, to_square, promotion)
         if not self.is_legal(move):
             raise IllegalMoveError(f"no matching legal move for {move.uci()} ({SQUARE_NAMES[from_square]} -> {SQUARE_NAMES[to_square]}) in {self.fen()}")
 
@@ -3108,11 +3109,8 @@ class Board(BaseBoard):
         *chess960* defaults to the mode of the board. Pass ``True`` to force
         Chess960 mode.
         """
-        if chess960 is None:
-            chess960 = self.chess960
 
-        move = self._to_chess960(move)
-        move = self._from_chess960(chess960, move.from_square, move.to_square, move.promotion, move.drop)
+        move = self._from_chess960(move.from_square, move.to_square, move.promotion)
         return move.uci()
 
     def parse_uci(self, uci: str) -> Move:
@@ -3136,7 +3134,7 @@ class Board(BaseBoard):
             return move
 
         move = self._to_chess960(move)
-        move = self._from_chess960(self.chess960, move.from_square, move.to_square, move.promotion, move.drop)
+        move = self._from_chess960(move.from_square, move.to_square, move.promotion)
 
         if not self.is_legal(move):
             raise IllegalMoveError(f"illegal uci: {uci!r} in {self.fen()}")
@@ -3608,7 +3606,7 @@ class Board(BaseBoard):
             if not ((self.occupied ^ king ^ rook) & (king_path | rook_path | king_to | rook_to) or
                     self._attacked_for_king(king_path | king, self.occupied ^ king) or
                     self._attacked_for_king(king_to, self.occupied ^ king ^ rook ^ rook_to)):
-                yield self._from_chess960(self.chess960, msb(king), candidate)
+                yield self._from_chess960(msb(king), candidate)
 
     def _from_chess960(self, from_square: Square, to_square: Square, promotion: Optional[PieceType] = None) -> Move:
         if promotion is None:

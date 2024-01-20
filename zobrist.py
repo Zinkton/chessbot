@@ -1,4 +1,5 @@
-from typing import Callable, List
+import random
+from typing import Callable, List, Optional
 import typing
 
 import chess
@@ -269,14 +270,14 @@ def zobrist_hash(board: chess.Board, *, _hasher: Callable[[chess.Board], int] = 
     """
     return _hasher(board)
 
-def update_hash(hash: int, board: chess.Board, move: chess.Move):
+def update_hash(hash: int, board: chess.Board, move: chess.Move, src_piece_type: Optional[chess.PieceType] = None):
     # switch turn
     new_hash = hash ^ POLYGLOT_RANDOM_ARRAY[780]
     if board.ep_square is not None:
         # remove ep_square
         new_hash ^= POLYGLOT_RANDOM_ARRAY[772 + chess.square_file(board.ep_square)]
     src_piece_type = board.piece_type_at(move.from_square)
-    piece_index = (typing.cast(chess.PieceType, src_piece_type) - 1) * 2 + int(board.turn)
+    piece_index = (src_piece_type - 1) * 2 + board.turn
     # Remove moved piece
     new_hash ^= POLYGLOT_RANDOM_ARRAY[64 * piece_index + move.from_square]
 
@@ -287,7 +288,7 @@ def update_hash(hash: int, board: chess.Board, move: chess.Move):
             # Is Castling
             # Move king to destination square, guaranteed no capture
             new_hash ^= POLYGLOT_RANDOM_ARRAY[64 * piece_index + move.to_square]
-            rook_index = (typing.cast(chess.PieceType, chess.ROOK) - 1) * 2 + int(board.turn)
+            rook_index = (chess.ROOK - 1) * 2 + board.turn
             if diff < 0:
                 # King castling
                 rook_square_source = chess.H1 if board.turn else chess.H8
@@ -334,7 +335,7 @@ def update_hash(hash: int, board: chess.Board, move: chess.Move):
 
     if dest_piece_type:
         # If we capture, remove the captured piece first
-        destination_piece_index = (typing.cast(chess.PieceType, dest_piece_type) - 1) * 2 + int(not board.turn)
+        destination_piece_index = (dest_piece_type - 1) * 2 + (not board.turn)
         new_hash ^= POLYGLOT_RANDOM_ARRAY[64 * destination_piece_index + move.to_square]
         if dest_piece_type == chess.ROOK:
             # Remove castling rights depending on rook
@@ -352,17 +353,17 @@ def update_hash(hash: int, board: chess.Board, move: chess.Move):
                 elif move.to_square == chess.H1:
                     if board.has_kingside_castling_rights(chess.WHITE):
                         new_hash ^= (POLYGLOT_RANDOM_ARRAY[768])
-    elif src_piece_type == chess.PAWN and move.to_square == board.ep_square:
+    elif move.to_square == board.ep_square and src_piece_type == chess.PAWN:
         # En-passant capture
         down = -8 if board.turn == chess.WHITE else 8
         capture_square = board.ep_square + down
-        destination_piece_index = (typing.cast(chess.PieceType, chess.PAWN) - 1) * 2 + int(not board.turn)
+        destination_piece_index = (chess.PAWN - 1) * 2 + (not board.turn)
         new_hash ^= POLYGLOT_RANDOM_ARRAY[64 * destination_piece_index + capture_square]
 
     # move to target square
     if move.promotion:
         # promotion
-        promotion_index = (typing.cast(chess.PieceType, move.promotion) - 1) * 2 + int(board.turn)
+        promotion_index = (move.promotion - 1) * 2 + board.turn
         new_hash ^= POLYGLOT_RANDOM_ARRAY[64 * promotion_index + move.to_square]
     else:
         if src_piece_type == chess.PAWN:
@@ -375,3 +376,16 @@ def update_hash(hash: int, board: chess.Board, move: chess.Move):
         new_hash ^= POLYGLOT_RANDOM_ARRAY[64 * piece_index + move.to_square]
         
     return new_hash
+
+if __name__ == '__main__':
+    for x in range(100):
+        board = chess.Board()
+        hash = zobrist_hash(board)
+        while True:
+            move = random.choice(list(board.legal_moves))
+            hash = update_hash(hash, board, move)
+            board.push(move)
+            real_hash = zobrist_hash(board)
+            assert hash == real_hash
+            if board.outcome():
+                break

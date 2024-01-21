@@ -4,7 +4,7 @@ import numpy as np
 import custom_chess as chess
 from chess_node import MtdfNode
 from evaluation import calculate_move_value
-from tt_utilities import probe_tt_killers
+from tt_utilities_dict import probe_tt_killers
 from zobrist import update_hash
 
 

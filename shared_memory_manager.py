@@ -29,10 +29,14 @@ class SharedMemoryManager():
         self.tt_killers.fill(0)
         self.tt_scores.fill(0)
 
+    def reset_process_status(self):
+        self.process_status.fill(0)
+
     def close(self):
         self.shm_tt_killers.close()
-        self.shm_tt_killers.unlink()
         self.shm_tt_scores.close()
-        self.shm_tt_scores.unlink()
         self.shm_process_status.close()
+
+        self.shm_tt_killers.unlink()
+        self.shm_tt_scores.unlink()
         self.shm_process_status.unlink()

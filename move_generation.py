@@ -49,44 +49,30 @@ def generate_ordered_legal_moves(board: chess.Board, killer_move: Optional[chess
     king = chess.msb(king_mask)
     blockers = board._slider_blockers(king)
     checkers = board.attackers_mask(not board.turn, king)
-    if checkers:
-        # In check, return all possible moves that escape check
-        evasion_generator = _generate_ordered_evasions(king, checkers, board)
-        # Captures
-        captures = next(evasion_generator)
-        legal_captures = [(capture, calculate_move_value(capture, board)) for capture in captures 
-                          if (killer_move is None or killer_move.from_square != capture.from_square or killer_move.to_square != capture.to_square) and board._is_safe(king, blockers, capture)]
-        legal_captures.sort(key=lambda x: x[1], reverse=True)
-        for legal_capture in legal_captures:
-            yield legal_capture
-        
-        other_moves = next(evasion_generator)
-        legal_other_moves = [(other_move, calculate_move_value(other_move, board)) for other_move in other_moves 
-                             if (killer_move is None or killer_move.from_square != other_move.from_square or killer_move.to_square != other_move.to_square) and board._is_safe(king, blockers, other_move)]
-        legal_other_moves.sort(key=lambda x: x[1], reverse=True)
-        for legal_other_move in legal_other_moves:
-            yield legal_other_move
-        # TEST get all moves and then order them by _calculate_move_value
-        # all_evasions = [(move, calculate_move_value(move, board)) for move in board._generate_evasions(board, king, checkers) if board._is_safe(king, blockers, move)]
-        # all_evasions.sort(key=lambda x: x[1], reverse=True)
-        # for item in all_evasions:
-        #     yield item
-    else:
-        move_generator = _generate_ordered_pseudo_legal_moves(board)
-
-        captures_promotions = next(move_generator)
-        legal_captures = [(capture, calculate_move_value(capture, board)) for capture in captures_promotions 
-                          if (killer_move is None or killer_move.from_square != capture.from_square or killer_move.to_square != capture.to_square) and board._is_safe(king, blockers, capture)]
-        legal_captures.sort(key=lambda x: x[1], reverse=True)
-        for legal_capture in legal_captures:
-            yield legal_capture
-        
-        other_moves = next(move_generator)
-        legal_other_moves = [(other_move, calculate_move_value(other_move, board)) for other_move in other_moves 
-                             if (killer_move is None or killer_move.from_square != other_move.from_square or killer_move.to_square != other_move.to_square) and board._is_safe(king, blockers, other_move)]
-        legal_other_moves.sort(key=lambda x: x[1], reverse=True)
-        for legal_other_move in legal_other_moves:
-            yield legal_other_move
+    generator = _generate_ordered_evasions(king, checkers, board) if checkers else _generate_ordered_pseudo_legal_moves(board)
+    captures = next(generator)
+    legal_captures = []
+    for capture in captures:
+        if killer_move is not None and killer_move.from_square == capture.from_square and killer_move.to_square == capture.to_square:
+            killer_move = None
+            continue
+        if board._is_safe(king, blockers, capture):
+            legal_captures.append((capture, calculate_move_value(capture, board)))
+    legal_captures.sort(key=lambda x: x[1], reverse=True)
+    for legal_capture in legal_captures:
+        yield legal_capture
+    
+    other_moves = next(generator)
+    legal_other_moves = []
+    for other_move in other_moves:
+        if killer_move is not None and killer_move.from_square == other_move.from_square and killer_move.to_square == other_move.to_square:
+            killer_move = None
+            continue
+        if board._is_safe(king, blockers, other_move):
+            legal_other_moves.append((other_move, calculate_move_value(other_move, board)))
+    legal_other_moves.sort(key=lambda x: x[1], reverse=True)
+    for legal_other_move in legal_other_moves:
+        yield legal_other_move
 
 def _generate_ordered_evasions(king: chess.Square, checkers: chess.Bitboard, board: chess.Board) -> Iterator[List[chess.Move]]:
     captures = []

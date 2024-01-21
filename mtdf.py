@@ -16,104 +16,9 @@ from tt_utilities_dict import probe_tt_scores, save_tt_killer, save_tt_score
 from zobrist import update_hash, zobrist_hash
 from evaluation import calculate_move_value, evaluate_board
 
-def solve_position_multiprocess(boards: List[chess.Board], manager: SharedMemoryManager, max_depth: int = 60) -> List:
-    manager.reset_tables()
-    process_chunks = [([], max_depth - 1, (manager.shm_tt_scores.name, manager.shm_tt_killers.name, manager.shm_process_status.name), x) for x in range(constants.PROCESS_COUNT)]
-    for index, board in enumerate(boards):
-        process_chunks[index % constants.PROCESS_COUNT][0].append(board)
-
-    evaluation_dictionary = {}
-    with Pool(processes=constants.PROCESS_COUNT) as p:
-        eval_dicts = p.map(iterative_deepening_multiple, process_chunks)
-        for dic in eval_dicts:
-            evaluation_dictionary.update(dic)
-
-    # print(evaluation_dictionary)
-
-    move_initial_values = {}
-    for board in boards:
-        for key in evaluation_dictionary:
-            if str(board.peek()) == str(key):
-                board.pop()
-                move_initial_values[key] = calculate_move_value(key, board)
-                board.push(key)
-
-    depths_moves_scores = [(evaluation_dictionary[key][0] + 1, key, evaluation_dictionary[key][1]) for key in evaluation_dictionary]
-    depths_moves_scores.sort(key=lambda x: (x[2], -x[0], -move_initial_values[x[1]]))
-    # print(depths_moves_scores)
-    print(f'depth: {depths_moves_scores[0][0]}')
-    if depths_moves_scores[0][2] <= -MAX_VALUE:
-        depths_moves_scores = [depth_move_score for depth_move_score in depths_moves_scores if depth_move_score[2] <= -MAX_VALUE]
-        return [depths_moves_scores[-1]]
-
-    return depths_moves_scores
-
-def iterative_deepening_multiple(input: Tuple) -> Dict:
-    start = time.perf_counter()
-    boards, max_depth, shared_memory_names, process_index = input
-    tt_scores_nm, tt_killers_nm, process_status_nm = shared_memory_names
-
-    shm_tt_scores = shared_memory.SharedMemory(name=tt_scores_nm)
-    shm_tt_killers = shared_memory.SharedMemory(name=tt_killers_nm)
-    shm_process_status = shared_memory.SharedMemory(name=process_status_nm)
-
-    tt_scores = np.ndarray((constants.TT_SIZE,), dtype=np.uint64, buffer=shm_tt_scores.buf)
-    tt_killers = np.ndarray((constants.TT_SIZE,), dtype=np.uint64, buffer=shm_tt_killers.buf)
-    process_status = np.ndarray((constants.PROCESS_COUNT,), dtype=np.int16, buffer=shm_process_status.buf)
-
-    roots_boards = []
-    for board in boards:
-        initial_value = -evaluate_board(board) if board.turn else evaluate_board(board)
-        root = MtdfNode(move=board.peek(), value=initial_value, hash=zobrist_hash(board))
-        roots_boards.append((root, board))
-
-    if not roots_boards:
-        process_status[process_index] = 100
-        shm_tt_scores.close()
-        shm_tt_killers.close()
-        shm_process_status.close()
-        return {}
-    
-    try:
-        result = {}
-        for depth in range(0, max_depth + 1):
-            process_status[process_index] = depth
-            if any(status == 101 for status in process_status):
-                return {}
-            # while not all(status >= depth for status in process_status):
-            #     time.sleep(0.01)
-
-            solved_roots = []
-            for root, board in roots_boards:
-                if root.gamma is None or abs(root.gamma) < MAX_VALUE:
-                    mtdf_result = _mtdf(root, depth, board, tt_scores, tt_killers, start)
-                    if mtdf_result is not None:
-                        _, result_score = mtdf_result
-                        result[root.move] = (depth, result_score)
-                        if result_score <= -MAX_VALUE:
-                            process_status[process_index] = 101
-                            return result
-                else:
-                    solved_roots.append((root, board))
-            for solved_root in solved_roots:
-                roots_boards.remove(solved_root)
-            
-            if not roots_boards:
-                process_status[process_index] = 100
-                return result
-
-        return result
-    except:
-        process_status[process_index] = 100
-        raise
-    finally:
-        shm_tt_scores.close()
-        shm_tt_killers.close()
-        shm_process_status.close()
-
 tt_scores = {}
 tt_killers = {}
-def solve_position_root(board: chess.Board, max_depth: int) -> Tuple[int, chess.Move, int]:
+def solve_position_root(board: chess.Board, max_depth: int = 100) -> Tuple[int, chess.Move, int]:
     global tt_scores
     global tt_killers
 
@@ -121,14 +26,16 @@ def solve_position_root(board: chess.Board, max_depth: int) -> Tuple[int, chess.
     root_node = MtdfNode(move=None, value=initial_value, hash=zobrist_hash(board))
     result = _iterative_deepening(root_node, board, tt_scores, tt_killers, max_depth)
 
+    print(f'depth: {result[0]}')
+
     return result
 
-def _iterative_deepening(root: MtdfNode, board: chess.Board, pos_table: np.ndarray, killer_table: np.ndarray, max_depth: Optional[int]) -> Tuple[int, chess.Move, int]:
+def _iterative_deepening(root: MtdfNode, board: chess.Board, tt_scores, tt_killers, max_depth: Optional[int]) -> Tuple[int, chess.Move, int]:
     start = time.perf_counter()
     result = None
     for depth in range(0, max_depth + 1):
         if root.gamma is None or abs(root.gamma) < MAX_VALUE:
-            mtdf_result = _mtdf(root, depth, board, pos_table, killer_table, start)
+            mtdf_result = _mtdf(root, depth, board, tt_scores, tt_killers, start)
             if mtdf_result is not None:
                 result_move, result_score = mtdf_result
                 result = (depth, result_move, result_score)
@@ -137,7 +44,7 @@ def _iterative_deepening(root: MtdfNode, board: chess.Board, pos_table: np.ndarr
         
     return result
 
-def _mtdf(root: MtdfNode, depth: int, board: chess.Board, tt_scores: np.ndarray, tt_killers: np.ndarray, start: Optional[float] = None) -> Tuple[chess.Move, int]:
+def _mtdf(root: MtdfNode, depth: int, board: chess.Board, tt_scores, tt_killers, start: Optional[float] = None) -> Tuple[chess.Move, int]:
     pos_result = probe_tt_scores(tt_scores, root.hash)
     if root.gamma is None:
         if pos_result is not None and pos_result[2] == constants.EXACT:
@@ -165,7 +72,7 @@ def _mtdf(root: MtdfNode, depth: int, board: chess.Board, tt_scores: np.ndarray,
     return best_move, root.gamma
 
 # @profile
-def _evaluate_child(value: int, hash: int, move: chess.Move, depth_left: int, alpha: int, beta: int, board: chess.Board, best_score: Tuple[Optional[chess.Move], int], tt_scores: np.ndarray, tt_killers: np.ndarray) -> Tuple[int, int, int, Tuple[Optional[chess.Move], int]]:
+def _evaluate_child(value: int, hash: int, move: chess.Move, depth_left: int, alpha: int, beta: int, board: chess.Board, best_score: Tuple[Optional[chess.Move], int], tt_scores, tt_killers) -> Tuple[int, int, int, Tuple[Optional[chess.Move], int]]:
     saved_value = probe_tt_scores(tt_scores, hash)
     score = None
     if saved_value is not None and saved_value[0] >= depth_left: # no touching
@@ -199,7 +106,7 @@ def _evaluate_child(value: int, hash: int, move: chess.Move, depth_left: int, al
     return score, alpha, beta, best_score
 
 # @profile
-def _alpha_beta(value: int, alpha: int, beta: int, depth_left: int, board: chess.Board, tt_scores: np.ndarray, tt_killers: np.ndarray, hash: int) -> Tuple[Optional[chess.Move], int]:
+def _alpha_beta(value: int, alpha: int, beta: int, depth_left: int, board: chess.Board, tt_scores, tt_killers, hash: int) -> Tuple[Optional[chess.Move], int]:
     best_score = (None, -(MAX_VALUE + depth_left))
 
     if depth_left == 0:

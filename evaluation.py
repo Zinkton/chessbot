@@ -130,7 +130,7 @@ def evaluate_board(board: chess.Board):
     score = 0
     for square in range(64):
         piece = board.piece_at(square)
-        if piece and piece.piece_type != chess.KING:
+        if piece:
             sign = 1 if piece.color else -1
             score += (piece_value[piece.piece_type] + position_value[piece.color][piece.piece_type][square]) * sign
     

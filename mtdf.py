@@ -15,21 +15,13 @@ from tt_utilities import probe_tt_scores, save_tt_killer, save_tt_score
 from zobrist import update_hash, zobrist_hash
 from evaluation import calculate_move_value, evaluate_board
 
-def solve_position_multiprocess(board: chess.Board = None, max_depth: int = 64, solve_position_params: List = None) -> List:
-    if solve_position_params is None:
-        solve_position_params = []
-        moves_to_evaluate = list(board.legal_moves)
-        for move in moves_to_evaluate:
-            board.push(move)
-            solve_position_params.append([board.copy(), max_depth - 1, None])
-            board.pop()
-
+def solve_position_multiprocess(solve_position_params: List = None) -> List:
     depths_moves_scores = None
     with Pool(processes=constants.PROCESS_COUNT) as p:
         depths_moves_scores = p.map(solve_position_root, solve_position_params)
 
     depths_moves_scores = [(depth + 1, solve_position_params[i][0].peek(), score) for i, (depth, _, score) in enumerate(depths_moves_scores)]
-    depths_moves_scores.sort(key=lambda x: (x[2], -x[0], -calculate_move_value(x[1], board)))
+    depths_moves_scores.sort(key=lambda x: (x[2], -x[0]))
     # print(depths_moves_scores)
     print(f'depth: {depths_moves_scores[0][0]}')
     if depths_moves_scores[0][2] <= -MAX_VALUE:
@@ -94,14 +86,13 @@ def _mtdf(root: MtdfNode, depth: int, board: chess.Board, tt_scores: np.ndarray,
     return best_move, root.gamma
 
 # @profile
-def _evaluate_child(value: int, hash: int, move: chess.Move, depth_left: int, alpha: int, beta: int, board: chess.Board, best_score: Tuple[Optional[chess.Move], int], tt_scores: np.ndarray, tt_killers: np.ndarray) -> Optional[int]:
+def _evaluate_child(value: int, hash: int, move: chess.Move, depth_left: int, alpha: int, beta: int, board: chess.Board, best_score: Tuple[Optional[chess.Move], int], tt_scores: np.ndarray, tt_killers: np.ndarray) -> Tuple[int, int, int, Tuple[Optional[chess.Move], int]]:
     saved_value = probe_tt_scores(tt_scores, hash)
     score = None
     if saved_value is not None and saved_value[0] >= depth_left: # no touching
-        
         _, saved_score, node_type = saved_value
         saved_score = saved_score if board.turn else -saved_score
-        
+
         if node_type == constants.EXACT:
             score = saved_score
         elif node_type == constants.LOWERBOUND and saved_score > alpha:
@@ -129,7 +120,7 @@ def _evaluate_child(value: int, hash: int, move: chess.Move, depth_left: int, al
     return score, alpha, beta, best_score
 
 # @profile
-def _alpha_beta(value: int, alpha: int, beta: int, depth_left: int, board: chess.Board, tt_scores: np.ndarray, tt_killers: np.ndarray, hash: int) -> Tuple[chess.Move, int]:
+def _alpha_beta(value: int, alpha: int, beta: int, depth_left: int, board: chess.Board, tt_scores: np.ndarray, tt_killers: np.ndarray, hash: int) -> Tuple[Optional[chess.Move], int]:
     best_score = (None, -(MAX_VALUE + depth_left))
 
     if depth_left == 0:

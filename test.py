@@ -4,6 +4,7 @@ import custom_chess
 import numpy as np
 import constants
 from chess_node import MtdfNode
+from move_generation import generate_ordered_legal_moves
 from mtdf import solve_position_multiprocess, solve_position_root
 from zobrist import zobrist_hash, update_hash
 from evaluation import calculate_move_value, evaluate_board
@@ -124,21 +125,22 @@ def performance_test_multiprocess():
     print(' '.join(stack))
 
 def performance_test():
-    board = chess.Board()
-    move = solve_and_filter(board, 6)[0]
-    board.push(move)
-    move = solve_and_filter(board, 6)[0]
-    board.push(move)
+    board = chess.Board('6k1/r7/8/6p1/6p1/6K1/8/8 b - - 1 55')
     move = solve_and_filter(board, 6)[0]
     move_mp = solve_and_filter_multiprocess(board, 6)[0][0]
     if str(move) != str(move_mp):
         print('error', move, move_mp)
 
 def solve_and_filter_multiprocess(board, max_depth):
-    result = solve_position_multiprocess(board, max_depth)
+    solve_position_params = []
+    for move, _ in generate_ordered_legal_moves(board):
+        board.push(move)
+        solve_position_params.append([board.copy(), max_depth - 1, None])
+        board.pop()
+    result = solve_position_multiprocess(solve_position_params)
     result = [r for r in result if r[2] == result[0][2]]
     print(result)
-    print([calculate_move_value(r[1], board) for r in result])
+    # print([calculate_move_value(r[1], board) for r in result])
     depth, move, score = result[0]
     return [(move, score)]
 

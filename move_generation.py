@@ -36,7 +36,7 @@ def generate_ordered_moves(board: chess.Board, hash: int, tt_killers: np.ndarray
     if killer_move is not None:
         yield (killer_move, calculate_move_value(killer_move, board))
 
-    sorted_moves = _generate_ordered_legal_moves(board, killer_move)
+    sorted_moves = generate_ordered_legal_moves(board, killer_move)
     # sorted_moves = _sorted_evaluated_legal_moves(board)
 
     for move in sorted_moves:
@@ -44,7 +44,7 @@ def generate_ordered_moves(board: chess.Board, hash: int, tt_killers: np.ndarray
 
 
 # @profile
-def _generate_ordered_legal_moves(board: chess.Board, killer_move: Optional[chess.Move]) -> Iterator[Tuple[chess.Move, int]]:
+def generate_ordered_legal_moves(board: chess.Board, killer_move: Optional[chess.Move] = None) -> Iterator[Tuple[chess.Move, int]]:
     king_mask = board.kings & board.occupied_co[board.turn]
     king = chess.msb(king_mask)
     blockers = board._slider_blockers(king)
@@ -54,13 +54,15 @@ def _generate_ordered_legal_moves(board: chess.Board, killer_move: Optional[ches
         evasion_generator = _generate_ordered_evasions(king, checkers, board)
         # Captures
         captures = next(evasion_generator)
-        legal_captures = [(capture, calculate_move_value(capture, board)) for capture in captures if killer_move != capture and board._is_safe(king, blockers, capture)]
+        legal_captures = [(capture, calculate_move_value(capture, board)) for capture in captures 
+                          if (killer_move is None or killer_move.from_square != capture.from_square or killer_move.to_square != capture.to_square) and board._is_safe(king, blockers, capture)]
         legal_captures.sort(key=lambda x: x[1], reverse=True)
         for legal_capture in legal_captures:
             yield legal_capture
         
         other_moves = next(evasion_generator)
-        legal_other_moves = [(other_move, calculate_move_value(other_move, board)) for other_move in other_moves if killer_move != other_move and board._is_safe(king, blockers, other_move)]
+        legal_other_moves = [(other_move, calculate_move_value(other_move, board)) for other_move in other_moves 
+                             if (killer_move is None or killer_move.from_square != other_move.from_square or killer_move.to_square != other_move.to_square) and board._is_safe(king, blockers, other_move)]
         legal_other_moves.sort(key=lambda x: x[1], reverse=True)
         for legal_other_move in legal_other_moves:
             yield legal_other_move
@@ -73,13 +75,15 @@ def _generate_ordered_legal_moves(board: chess.Board, killer_move: Optional[ches
         move_generator = _generate_ordered_pseudo_legal_moves(board)
 
         captures_promotions = next(move_generator)
-        legal_captures = [(capture, calculate_move_value(capture, board)) for capture in captures_promotions if killer_move != capture and board._is_safe(king, blockers, capture)]
+        legal_captures = [(capture, calculate_move_value(capture, board)) for capture in captures_promotions 
+                          if (killer_move is None or killer_move.from_square != capture.from_square or killer_move.to_square != capture.to_square) and board._is_safe(king, blockers, capture)]
         legal_captures.sort(key=lambda x: x[1], reverse=True)
         for legal_capture in legal_captures:
             yield legal_capture
         
         other_moves = next(move_generator)
-        legal_other_moves = [(other_move, calculate_move_value(other_move, board)) for other_move in other_moves if killer_move != other_move and board._is_safe(king, blockers, other_move)]
+        legal_other_moves = [(other_move, calculate_move_value(other_move, board)) for other_move in other_moves 
+                             if (killer_move is None or killer_move.from_square != other_move.from_square or killer_move.to_square != other_move.to_square) and board._is_safe(king, blockers, other_move)]
         legal_other_moves.sort(key=lambda x: x[1], reverse=True)
         for legal_other_move in legal_other_moves:
             yield legal_other_move

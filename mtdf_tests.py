@@ -1,6 +1,7 @@
 
 import time
 import chess
+from move_generation import generate_ordered_legal_moves
 from mtdf import solve_position_multiprocess, solve_position_root
 from constants import MAX_VALUE
 
@@ -200,11 +201,13 @@ def compare_performance():
     stack = []
     while True:
         start = time.perf_counter()
-        move = solve_and_filter_multiprocess(board, 6)[0][0]
+        move, mp_score = solve_and_filter_multiprocess(board, 6)[0]
         multi_process_time += time.perf_counter() - start
         start = time.perf_counter()
-        solve_and_filter(board, 6)
+        sp_move, sp_score = solve_and_filter(board, 6)
         single_process_time += time.perf_counter() - start
+        if mp_score != -sp_score:
+            print('ERROR', mp_score, sp_score, move, sp_move)
         stack.append(board.san(move))
         board.push(move)
         if board.outcome(claim_draw=True):
@@ -212,8 +215,14 @@ def compare_performance():
     print(f'single process: {single_process_time} multi process: {multi_process_time}')
     print(' '.join(stack))
 
-def solve_and_filter_multiprocess(board, max_depth):
-    depth, move, score = solve_position_multiprocess(board, max_depth)[0]
+def solve_and_filter_multiprocess(board: chess.Board, max_depth):
+    solve_position_params = []
+    for move, _ in generate_ordered_legal_moves(board):
+        board.push(move)
+        solve_position_params.append([board.copy(), max_depth - 1, None])
+        board.pop()
+    result = solve_position_multiprocess(solve_position_params)
+    depth, move, score = result[0]
     return [(move, score)]
 
 def solve_and_filter(board, max_depth):

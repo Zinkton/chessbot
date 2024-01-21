@@ -115,7 +115,7 @@ def calculate_move_value(move: chess.Move, board: chess.Board):
         down = -8 if board.turn == chess.WHITE else 8
         capture_square = board.ep_square + down
         value += piece_value[chess.PAWN] + position_value[not board.turn][chess.PAWN][capture_square]
-        
+
     return value
 
 def _check_castling(board: chess.Board, move: chess.Move):

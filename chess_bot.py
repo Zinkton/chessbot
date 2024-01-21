@@ -8,7 +8,7 @@ from chess import Board
 from multiprocessing import Pool
 from sss_algorithm import solve_position
 from collections import deque
-from mtdf import solve_position_root
+from mtdf import solve_position_multiprocess, solve_position_root
 
 class ChessBot():
     def __init__(self):
@@ -69,22 +69,24 @@ class ChessBot():
 
     def _evaluate_and_filter_best_moves(self, board, unevaluated_moves, max_depth):
         # A board copy to manipulate, depth of search and the move to evaluate
-        # solve_position_params = [[board.copy(), max_depth, move] for move, _ in unevaluated_moves]
-        
-        # with Pool(processes=constants.PROCESS_COUNT) as p:
-        #     evaluated_moves = p.map(solve_position, solve_position_params)
+        solve_position_params = []
+        for move, _ in unevaluated_moves:
+            board.push(move)
+            solve_position_params.append([board.copy(), 99])
+            board.pop(move)
+        evaluated_moves = solve_position_multiprocess(solve_position_params)
 
-        #winning_evaluated_moves = self._filter_winning_evaluated_moves(evaluated_moves)
-        evaluated_moves = solve_position_root(board)
-        if len(evaluated_moves) > 1:
-            self._remove_repeating_move(evaluated_moves, board)
+        winning_evaluated_moves = self._filter_winning_evaluated_moves(evaluated_moves)
+        # evaluated_moves = solve_position_root(board)
+        if len(winning_evaluated_moves) > 1:
+            self._remove_repeating_move(winning_evaluated_moves, board)
             evaluated_moves = evaluated_moves
             
-        # best_evaluated_moves = self._filter_best_evaluated_moves(evaluated_moves)
-        # if len(best_evaluated_moves) > 1:
-        #     self._prioritize_promotion_and_capture(best_evaluated_moves, board)
-        #     # Filter again after adjusting scores
-        #     best_evaluated_moves = self._filter_best_evaluated_moves(evaluated_moves)
+        best_evaluated_moves = self._filter_best_evaluated_moves(winning_evaluated_moves)
+        if len(best_evaluated_moves) > 1:
+            self._prioritize_promotion_and_capture(best_evaluated_moves, board)
+            # Filter again after adjusting scores
+            best_evaluated_moves = self._filter_best_evaluated_moves(best_evaluated_moves)
             
         return [best_evaluated_move[0] for best_evaluated_move in evaluated_moves]
     

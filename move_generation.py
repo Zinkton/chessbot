@@ -1,5 +1,5 @@
 from typing import Dict, Iterator, List, Optional, Tuple
-import chess
+import custom_chess as chess
 from chess_node import MtdfNode
 from evaluation import calculate_move_value
 from zobrist import update_hash

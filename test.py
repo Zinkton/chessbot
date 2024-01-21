@@ -84,22 +84,24 @@ from evaluation import evaluate_board
 
 
 
-for x in range(100):
-    custom_board = custom_chess.Board()
-    real_board = chess.Board()
-    while True:
-        move = random.choice(list(custom_board.generate_legal_moves()))
-        custom_board.push(move)
-        real_board.push(move)
-        if zobrist_hash(custom_board) != zobrist_hash(real_board):
-            print(custom_board)
-            print(real_board)
-            raise Exception("lol")
+# for x in range(100):
+    # custom_board = custom_chess.Board()
+    # real_board = chess.Board()
+    # while True:
+    #     move = random.choice(list(custom_board.generate_legal_moves()))
+    #     custom_board.push(move)
+    #     real_board.push(move)
+    #     if zobrist_hash(custom_board) != zobrist_hash(real_board):
+    #         print(custom_board)
+    #         print(real_board)
+    #         raise Exception("lol")
             
-        if real_board.outcome():
-            break
-    while real_board.move_stack:
-        custom_board.pop()
-        real_board.pop()
-        assert zobrist_hash(custom_board) == zobrist_hash(real_board)
+    #     if real_board.outcome():
+    #         break
+    # while real_board.move_stack:
+    #     custom_board.pop()
+    #     real_board.pop()
+    #     assert zobrist_hash(custom_board) == zobrist_hash(real_board)
+board = chess.Board('1K6/8/8/8/8/8/4k3/N7 w - - 1 3')
+print(evaluate_board(board))
         

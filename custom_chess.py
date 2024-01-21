@@ -1732,9 +1732,9 @@ class Board(BaseBoard):
             for to_square in scan_reversed(targets):
                 if square_rank(to_square) in [0, 7]:
                     yield Move(from_square, to_square, QUEEN)
-                    yield Move(from_square, to_square, ROOK)
-                    yield Move(from_square, to_square, BISHOP)
-                    yield Move(from_square, to_square, KNIGHT)
+                    # yield Move(from_square, to_square, ROOK)
+                    # yield Move(from_square, to_square, BISHOP)
+                    # yield Move(from_square, to_square, KNIGHT)
                 else:
                     yield Move(from_square, to_square)
 
@@ -1755,9 +1755,9 @@ class Board(BaseBoard):
 
             if square_rank(to_square) in [0, 7]:
                 yield Move(from_square, to_square, QUEEN)
-                yield Move(from_square, to_square, ROOK)
-                yield Move(from_square, to_square, BISHOP)
-                yield Move(from_square, to_square, KNIGHT)
+                # yield Move(from_square, to_square, ROOK)
+                # yield Move(from_square, to_square, BISHOP)
+                # yield Move(from_square, to_square, KNIGHT)
             else:
                 yield Move(from_square, to_square)
 
@@ -1835,12 +1835,8 @@ class Board(BaseBoard):
 
     def is_pseudo_legal(self, move: Move) -> bool:
         # Null moves are not pseudo-legal.
-        if not move:
-            return False
-
-        # Drops are not pseudo-legal.
-        if move.drop:
-            return False
+        # if not move:
+        #     return False
 
         # Source square must not be vacant.
         piece = self.piece_type_at(move.from_square)
@@ -3583,7 +3579,7 @@ class Board(BaseBoard):
             return
 
         backrank = BB_RANK_1 if self.turn == WHITE else BB_RANK_8
-        king = self.occupied_co[self.turn] & self.kings & ~self.promoted & backrank & from_mask
+        king = self.occupied_co[self.turn] & self.kings & backrank & from_mask
         king &= -king
         if not king:
             return

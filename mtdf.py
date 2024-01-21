@@ -160,5 +160,12 @@ if __name__ == '__main__':
     #         if board.outcome() is not None:
     #             break
     # print('success')
-    board = chess.Board('4k3/8/8/3q4/1N6/8/8/4K3 w - - 0 1')
-    move = solve_position_root(board, 0)
+    board = chess.Board()
+    stack = []
+    while True:
+        move, score = solve_position_root(board, 7)
+        stack.append(board.san(move))
+        board.push(move)
+        if board.outcome(claim_draw=True):
+            break
+    print(stack)

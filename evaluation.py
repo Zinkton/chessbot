@@ -1,4 +1,4 @@
-import chess
+import custom_chess as chess
 from constants import MAX_VALUE
 
 # Piece values

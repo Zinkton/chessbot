@@ -208,13 +208,15 @@ def _generate_ordered_pseudo_legal_moves(board: chess.Board) -> Iterator[List[ch
         for to_square in chess.scan_reversed(single_moves):
             from_square = to_square + (8 if board.turn == chess.BLACK else -8)
             other_moves.append(chess.Move(from_square, to_square))
-    
+
     yield other_moves
 
 def _generate_castling_moves(board: chess.Board) -> Iterator[chess.Move]:
     backrank = chess.BB_RANK_1 if board.turn == chess.WHITE else chess.BB_RANK_8
     king = board.occupied_co[board.turn] & board.kings & backrank
     king &= -king
+    if not king:
+        return
 
     bb_c = chess.BB_FILE_C & backrank
     bb_d = chess.BB_FILE_D & backrank
@@ -234,7 +236,7 @@ def _generate_castling_moves(board: chess.Board) -> Iterator[chess.Move]:
         if not ((board.occupied ^ king ^ rook) & (king_path | rook_path | king_to | rook_to) or
                 board._attacked_for_king(king_path | king, board.occupied ^ king) or
                 board._attacked_for_king(king_to, board.occupied ^ king ^ rook ^ rook_to)):
-            yield board._from_chess960(board.chess960, chess.msb(king), candidate)
+            yield board._from_chess960(chess.msb(king), candidate)
 
 def _clean_castling_rights(board: chess.Board) -> chess.Bitboard:
     """

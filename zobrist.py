@@ -270,7 +270,7 @@ def zobrist_hash(board: chess.Board, *, _hasher: Callable[[chess.Board], int] = 
     """
     return _hasher(board)
 
-def update_hash(hash: int, board: chess.Board, move: chess.Move):
+def update_hash(hash: int, board: chess.Board, move: chess.Move, src_piece_type: Optional[chess.PieceType] = None):
     # switch turn
     new_hash = hash ^ POLYGLOT_RANDOM_ARRAY[780]
     if board.ep_square is not None:

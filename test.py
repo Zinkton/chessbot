@@ -1,14 +1,12 @@
-import ctypes
-import multiprocessing
-from multiprocessing import shared_memory
-from typing import Dict, List, Optional
+from typing import Dict, List
 import chess, random, time
 import custom_chess
 import numpy as np
 import constants
 from chess_node import MtdfNode
+from mtdf import solve_position_multiprocess, solve_position_root
 from zobrist import zobrist_hash, update_hash
-from evaluation import evaluate_board
+from evaluation import calculate_move_value, evaluate_board
 
 # def worker_function(args):
 #     shared_memory_name, index = args
@@ -102,6 +100,52 @@ from evaluation import evaluate_board
     #     custom_board.pop()
     #     real_board.pop()
     #     assert zobrist_hash(custom_board) == zobrist_hash(real_board)
-board = chess.Board('1K6/8/8/8/8/8/4k3/N7 w - - 1 3')
-print(evaluate_board(board))
+# board = chess.Board('1K6/8/8/8/8/8/4k3/N7 w - - 1 3')
+# print(evaluate_board(board))
         
+
+# # Example usage
+# packed = pack_values(45, -500000, 2)  # Example values for d, s, t
+# d, s, t = unpack_values(packed)
+# print(f"Packed value: {packed}")
+# print(f"Unpacked values: d = {d}, s = {s}, t = {t}")
+
+def performance_test_multiprocess():
+    board = chess.Board()
+    start = time.perf_counter()
+    stack = []
+    while True:
+        move = solve_and_filter_multiprocess(board, 6)[0][0]
+        stack.append(board.san(move))
+        board.push(move)
+        if board.outcome(claim_draw=True):
+            break
+    print(time.perf_counter() - start)
+    print(' '.join(stack))
+
+def performance_test():
+    board = chess.Board()
+    move = solve_and_filter(board, 6)[0]
+    board.push(move)
+    move = solve_and_filter(board, 6)[0]
+    board.push(move)
+    move = solve_and_filter(board, 6)[0]
+    move_mp = solve_and_filter_multiprocess(board, 6)[0][0]
+    if str(move) != str(move_mp):
+        print('error', move, move_mp)
+
+def solve_and_filter_multiprocess(board, max_depth):
+    result = solve_position_multiprocess(board, max_depth)
+    result = [r for r in result if r[2] == result[0][2]]
+    print(result)
+    print([calculate_move_value(r[1], board) for r in result])
+    depth, move, score = result[0]
+    return [(move, score)]
+
+def solve_and_filter(board, max_depth):
+    depth, move, score = solve_position_root([board, max_depth, None])
+    print(depth, move, score)
+    return (move, score)
+
+if __name__ == '__main__':
+    performance_test()

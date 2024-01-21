@@ -1,7 +1,10 @@
 from typing import Dict, Iterator, List, Optional, Tuple
+
+import numpy as np
 import custom_chess as chess
 from chess_node import MtdfNode
 from evaluation import calculate_move_value
+from tt_utilities import probe_tt_killers
 from zobrist import update_hash
 
 
@@ -28,8 +31,8 @@ def _king(board: chess.Board, color: chess.Color) -> chess.Square:
     return chess.msb(king_mask)
 
 # @profile
-def generate_ordered_moves(board: chess.Board, hash: int, killer_table: Dict) -> Iterator[Tuple[chess.Move, int]]:
-    killer_move = killer_table.get(hash, None)
+def generate_ordered_moves(board: chess.Board, hash: int, tt_killers: np.ndarray) -> Iterator[Tuple[chess.Move, int]]:
+    killer_move = probe_tt_killers(tt_killers, hash)
     if killer_move is not None:
         yield (killer_move, calculate_move_value(killer_move, board))
 

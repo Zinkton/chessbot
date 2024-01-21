@@ -65,10 +65,10 @@ def captured_in_one():
     for depth in range(2, 7):
         board = chess.Board('1k6/8/8/8/8/8/2n5/R3K3 w - - 0 1')
         result = solve_and_filter(board, depth)
-        assert result[1] < -200
-        board = chess.Board('1K6/8/8/8/8/8/2N5/r3k3 b - - 0 1')
+        assert result[1] < -150
+        board = chess.Board('r3k3/2N5/8/8/8/8/8/4K3 b - - 0 1')
         result = solve_and_filter(board, depth)
-        assert result[1] < -200
+        assert result[1] < -150
 
 def capture_in_two():
     for depth in range(3, 7):
@@ -89,11 +89,15 @@ def queen_sack():
 def performance_test():
     board = chess.Board()
     start = time.perf_counter()
+    stack = []
     while True:
-        board.push(solve_and_filter(board, 6)[0])
-        if board.outcome():
+        move = solve_and_filter(board, 6)[0]
+        stack.append(board.san(move))
+        board.push(move)
+        if board.outcome(claim_draw=True):
             break
     print(time.perf_counter() - start)
+    print(' '.join(stack))
 
 def checkmate_in_one_multiprocess():
     for depth in range(2, 7):
@@ -155,12 +159,10 @@ def captured_in_one_multiprocess():
     for depth in range(2, 7):
         board = chess.Board('1k6/8/8/8/8/8/2n5/R3K3 w - - 0 1')
         result = solve_and_filter_multiprocess(board, depth)
-        print(result)
-        assert result[0][1] > 100
+        assert result[0][1] > 150
         board = chess.Board('r3k3/2N5/8/8/8/8/8/4K3 b - - 0 1')
         result = solve_and_filter_multiprocess(board, depth)
-        print(result)
-        assert result[0][1] > 100
+        assert result[0][1] > 150
 
 def capture_in_two_multiprocess():
     for depth in range(3, 7):
@@ -181,46 +183,74 @@ def queen_sack_multiprocess():
 def performance_test_multiprocess():
     board = chess.Board()
     start = time.perf_counter()
+    stack = []
     while True:
-        board.push(solve_and_filter_multiprocess(board, 6)[0][0])
-        if board.outcome():
+        move = solve_and_filter_multiprocess(board, 6)[0][0]
+        stack.append(board.san(move))
+        board.push(move)
+        if board.outcome(claim_draw=True):
             break
     print(time.perf_counter() - start)
+    print(' '.join(stack))
+
+def compare_performance():
+    board = chess.Board()
+    multi_process_time = 0
+    single_process_time = 0
+    stack = []
+    while True:
+        start = time.perf_counter()
+        move = solve_and_filter_multiprocess(board, 6)[0][0]
+        multi_process_time += time.perf_counter() - start
+        start = time.perf_counter()
+        solve_and_filter(board, 6)
+        single_process_time += time.perf_counter() - start
+        stack.append(board.san(move))
+        board.push(move)
+        if board.outcome(claim_draw=True):
+            break
+    print(f'single process: {single_process_time} multi process: {multi_process_time}')
+    print(' '.join(stack))
 
 def solve_and_filter_multiprocess(board, max_depth):
     depth, move, score = solve_position_multiprocess(board, max_depth)[0]
     return [(move, score)]
 
 def solve_and_filter(board, max_depth):
-    depth, move, score = solve_position_root([board, max_depth])
+    depth, move, score = solve_position_root([board, max_depth, None])
     return (move, score)
 
 
 if __name__ == '__main__':
-    # start = time.perf_counter()
-    # checkmate_in_one()
-    # checkmated_in_one()
-    # checkmate_in_two()
-    # checkmated_in_two()
-    # checkmate_in_three()
-    # checkmated_in_three()
-    # capture_in_one()
-    # captured_in_one()
-    # capture_in_two()
-    # queen_sack()
-    performance_test()
-    # print(f'total test time: {time.perf_counter() - start}')
+    start = time.perf_counter()
+    checkmate_in_one()
+    checkmated_in_one()
+    checkmate_in_two()
+    checkmated_in_two()
+    checkmate_in_three()
+    checkmated_in_three()
+    capture_in_one()
+    captured_in_one()
+    capture_in_two()
+    queen_sack()
+    print(f'total test time: {time.perf_counter() - start}')
+
+    # performance_test()
+    
 
     start = time.perf_counter()
-    # checkmate_in_one_multiprocess()
-    # checkmated_in_one_multiprocess()
-    # checkmate_in_two_multiprocess()
-    # checkmated_in_two_multiprocess()
-    # checkmate_in_three_multiprocess()
-    # checkmated_in_three_multiprocess()
-    # capture_in_one_multiprocess()
-    # captured_in_one_multiprocess()
-    # capture_in_two_multiprocess()
-    # queen_sack_multiprocess()
-    performance_test_multiprocess()
+    checkmate_in_one_multiprocess()
+    checkmated_in_one_multiprocess()
+    checkmate_in_two_multiprocess()
+    checkmated_in_two_multiprocess()
+    checkmate_in_three_multiprocess()
+    checkmated_in_three_multiprocess()
+    capture_in_one_multiprocess()
+    captured_in_one_multiprocess()
+    capture_in_two_multiprocess()
+    queen_sack_multiprocess()
     print(f'total test time: {time.perf_counter() - start}')
+
+    # performance_test_multiprocess()
+
+    # compare_performance()

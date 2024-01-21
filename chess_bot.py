@@ -76,19 +76,18 @@ class ChessBot():
             board.pop(move)
         evaluated_moves = solve_position_multiprocess(solve_position_params)
 
-        winning_evaluated_moves = self._filter_winning_evaluated_moves(evaluated_moves)
+        # evaluated_moves = self._filter_winning_evaluated_moves(evaluated_moves)
         # evaluated_moves = solve_position_root(board)
-        if len(winning_evaluated_moves) > 1:
-            self._remove_repeating_move(winning_evaluated_moves, board)
-            evaluated_moves = evaluated_moves
+        if len(evaluated_moves) > 1:
+            self._remove_repeating_move(evaluated_moves, board)
             
-        best_evaluated_moves = self._filter_best_evaluated_moves(winning_evaluated_moves)
-        if len(best_evaluated_moves) > 1:
-            self._prioritize_promotion_and_capture(best_evaluated_moves, board)
-            # Filter again after adjusting scores
-            best_evaluated_moves = self._filter_best_evaluated_moves(best_evaluated_moves)
+        best_evaluated_moves = self._filter_best_evaluated_moves(evaluated_moves)
+        # if len(best_evaluated_moves) > 1:
+        #     self._prioritize_promotion_and_capture(best_evaluated_moves, board)
+        #     # Filter again after adjusting scores
+        #     best_evaluated_moves = self._filter_best_evaluated_moves(best_evaluated_moves)
             
-        return [best_evaluated_move[0] for best_evaluated_move in evaluated_moves]
+        return [best_evaluated_move[0] for best_evaluated_move in best_evaluated_moves]
     
     def _filter_winning_evaluated_moves(self, evaluated_moves):
         return [evaluated_move for evaluated_move in evaluated_moves if evaluated_move[1] <= 0]

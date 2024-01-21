@@ -1,9 +1,5 @@
-import itertools
-from multiprocessing import Pool, shared_memory
 import time
-from typing import Dict, List, Optional, Tuple
-
-import numpy as np
+from typing import Optional, Tuple
 
 import custom_chess as chess
 
@@ -11,10 +7,9 @@ import constants
 from chess_node import MtdfNode
 from constants import MAX_VALUE, SECONDS_PER_MOVE
 from move_generation import is_check, generate_ordered_moves
-from shared_memory_manager import SharedMemoryManager
 from tt_utilities_dict import probe_tt_scores, save_tt_killer, save_tt_score
 from zobrist import update_hash, zobrist_hash
-from evaluation import calculate_move_value, evaluate_board
+from evaluation import evaluate_board
 
 tt_scores = {}
 tt_killers = {}
@@ -24,11 +19,11 @@ def solve_position_root(board: chess.Board, max_depth: int = 100) -> Tuple[int, 
 
     initial_value = -evaluate_board(board) if board.turn else evaluate_board(board)
     root_node = MtdfNode(move=None, value=initial_value, hash=zobrist_hash(board))
-    result = _iterative_deepening(root_node, board, tt_scores, tt_killers, max_depth)
+    depth, move, score = _iterative_deepening(root_node, board, tt_scores, tt_killers, max_depth)
 
-    print(f'depth: {result[0]}')
+    print(f'depth: {depth}')
 
-    return result
+    return (move, score)
 
 def _iterative_deepening(root: MtdfNode, board: chess.Board, tt_scores, tt_killers, max_depth: Optional[int]) -> Tuple[int, chess.Move, int]:
     start = time.perf_counter()
@@ -56,8 +51,8 @@ def _mtdf(root: MtdfNode, depth: int, board: chess.Board, tt_scores, tt_killers,
     lower_bound = -MAX_VALUE - depth
     
     while upper_bound - lower_bound > 0:
-        # if start and time.perf_counter() - start >= SECONDS_PER_MOVE:
-        #     return None
+        if start and time.perf_counter() - start >= SECONDS_PER_MOVE:
+            return None
         
         beta = root.gamma + 1 if root.gamma == lower_bound else root.gamma
         (best_move, root.gamma) = _alpha_beta(root.value, beta - 1, beta, depth, board, tt_scores, tt_killers, root.hash)
@@ -83,8 +78,8 @@ def _evaluate_child(value: int, hash: int, move: chess.Move, depth_left: int, al
             score = saved_score
         elif node_type == constants.LOWERBOUND and saved_score > alpha:
             score = saved_score
-        # elif node_type == constants.UPPERBOUND and saved_score < beta:
-        #     score = saved_score
+        elif node_type == constants.UPPERBOUND and saved_score < beta:
+            score = saved_score
     found_value = score is not None
     if not found_value:
         board.push(move)
@@ -92,14 +87,15 @@ def _evaluate_child(value: int, hash: int, move: chess.Move, depth_left: int, al
         score = -score
         board.pop()
 
-    if score > beta:
+    if score >= beta:
         save_tt_score(tt_scores, depth_left, board.turn, constants.LOWERBOUND, saved_value, hash, score)
         return score, alpha, beta, (None, score) # fail-soft beta-cutoff
     elif score > alpha:
         save_tt_score(tt_scores, depth_left, board.turn, constants.EXACT, saved_value, hash, score)
         alpha = score
-    # else:
-    #     _save_score(pos_table, depth_left, board.turn, constants.UPPERBOUND, saved_value, child, score)
+    else:
+        save_tt_score(tt_scores, depth_left, board.turn, constants.UPPERBOUND, saved_value, hash, score)
+        
     if score > best_score[1]:
         best_score = (move, score)
 
@@ -130,19 +126,27 @@ def _alpha_beta(value: int, alpha: int, beta: int, depth_left: int, board: chess
 
 # @profile
 def _quiescence(value: int, alpha: int, beta: int, board: chess.Board) -> int:
+    # print(value, alpha, beta)
     return -value
-    # if is_checkmate(board):
-    #     return -MAX_VALUE
-    # else:
-    #     return -node.value
-    # any_legal_moves = any(board.generate_legal_moves())
-    # if not any_legal_moves:
-    #     if board.is_check():
-    #         return -MAX_VALUE
-    #     else:
-    #         return 0
-    # else:
-    #     return -node.value
+    # stand_pat = -value
+    # if stand_pat >= beta:
+    #     return stand_pat
+    # if alpha < stand_pat:
+    #     alpha = stand_pat;
+
+    # until( every_capture_has_been_examined )  {
+    #     MakeCapture();
+    #     score = -Quiesce( -beta, -alpha );
+    #     TakeBackMove();
+
+    #     if( score >= beta )
+    #         return beta;
+    #     if( score > alpha )
+    #        alpha = score;
+    # }
+    # return alpha;
+
+    # return -value
 
 if __name__ == '__main__':
     # for x in range(1000):
@@ -156,5 +160,5 @@ if __name__ == '__main__':
     #         if board.outcome() is not None:
     #             break
     # print('success')
-    board = chess.Board()
-    move = solve_position_root(board, 5)
+    board = chess.Board('4k3/8/8/3q4/1N6/8/8/4K3 w - - 0 1')
+    move = solve_position_root(board, 0)

@@ -5,10 +5,8 @@ from time import perf_counter, sleep
 from utilities import flip_and_mirror_fen, invert_rank
 from evaluation import piece_value
 from chess import Board
-from multiprocessing import Pool
-from sss_algorithm import solve_position
 from collections import deque
-from mtdf import solve_position_multiprocess, solve_position_root
+from mtdf import solve_position_root
 
 class ChessBot():
     def __init__(self):

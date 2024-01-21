@@ -4,7 +4,7 @@ import requests
 from time import perf_counter, sleep
 from utilities import flip_and_mirror_fen, invert_rank
 from evaluation import piece_value
-from chess import Board
+from custom_chess import Board
 from collections import deque
 from mtdf import solve_position_root
 

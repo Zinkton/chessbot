@@ -9,7 +9,7 @@ import custom_chess as chess
 from chess_node import MtdfNode
 from constants import MAX_VALUE, SECONDS_PER_MOVE
 from evaluation import evaluate_board
-from move_generation import generate_ordered_moves, is_check
+from move_generation import generate_ordered_moves, generate_quiescence_moves, is_check
 from tt_utilities_dict import probe_tt_scores, save_tt_killer, save_tt_score
 from zobrist import update_hash, zobrist_hash
 
@@ -122,14 +122,13 @@ def _evaluate_child(value: int, parent_hash: int, move: chess.Move, depth_left: 
     if score >= beta:
         save_tt_score(tt_scores, depth_left, board.turn, constants.LOWERBOUND, saved_value, hash, score)
         return score, alpha, beta, (None, score) # fail-soft beta-cutoff
-    elif score > alpha:
-        save_tt_score(tt_scores, depth_left, board.turn, constants.EXACT, saved_value, hash, score)
-        alpha = score
+    elif score > best_score[1]:
+        best_score = (move, score)
+        if score > alpha:
+            save_tt_score(tt_scores, depth_left, board.turn, constants.EXACT, saved_value, hash, score)
+            alpha = score
     else:
         save_tt_score(tt_scores, depth_left, board.turn, constants.UPPERBOUND, saved_value, hash, score)
-        
-    if score > best_score[1]:
-        best_score = (move, score)
 
     return score, alpha, beta, best_score
 
@@ -157,27 +156,26 @@ def _alpha_beta(value: int, alpha: int, beta: int, depth_left: int, board: chess
 
 # @profile
 def _quiescence(value: int, alpha: int, beta: int, board: chess.Board) -> int:
-    # print(value, alpha, beta)
-    return -value
-    # stand_pat = -value
-    # if stand_pat >= beta:
-    #     return stand_pat
-    # if alpha < stand_pat:
-    #     alpha = stand_pat;
+    stand_pat = -value
+    if stand_pat >= beta:
+        return stand_pat # fail soft beta cut-off
+    best_score = stand_pat
+    if stand_pat > alpha:
+        alpha = stand_pat
+    
+    for move, move_value in generate_quiescence_moves(board):
+        board.push(move)
+        score = -_quiescence(stand_pat + move_value, -beta, -alpha, board)
+        board.pop()
 
-    # until( every_capture_has_been_examined )  {
-    #     MakeCapture();
-    #     score = -Quiesce( -beta, -alpha );
-    #     TakeBackMove();
+        if score >= beta:
+            return beta
+        if score > best_score:
+            best_score = score
+            if score > alpha:
+                alpha = score
 
-    #     if( score >= beta )
-    #         return beta;
-    #     if( score > alpha )
-    #        alpha = score;
-    # }
-    # return alpha;
-
-    # return -value
+    return best_score
 
 if __name__ == '__main__':
     # for x in range(1000):

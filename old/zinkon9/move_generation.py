@@ -7,11 +7,6 @@ from chess_node import MtdfNode
 from evaluation import calculate_move_value
 from tt_utilities_dict import probe_tt_killers
 
-
-def sorted_child_generator(node: MtdfNode):
-    for key in node.sorted_children_keys:
-        yield node.children[key]
-        
 # @profile
 def is_checkmate(board: chess.Board) -> bool:
     if not is_check(board):
@@ -19,16 +14,20 @@ def is_checkmate(board: chess.Board) -> bool:
     
     return not any(board.generate_legal_moves())
 
-def _checkers_mask(board: chess.Board) -> chess.Bitboard:
-    king = _king(board, board.turn)
-    return board.attackers_mask(not board.turn, king)
-
-def is_check(board: chess.Board()) -> bool:
-    return bool(_checkers_mask(board))
-
-def _king(board: chess.Board, color: chess.Color) -> chess.Square:
-    king_mask = board.occupied_co[color] & board.kings
-    return chess.msb(king_mask)
+def generate_quiescence_moves(board: chess.Board) -> List[Tuple[chess.Move, int]]:
+    king_mask = board.kings & board.occupied_co[board.turn]
+    king = chess.msb(king_mask)
+    blockers = board._slider_blockers(king)
+    checkers = board.attackers_mask(not board.turn, king)
+    moves_to_evaluate = None
+    if checkers:
+        generator = _generate_ordered_evasions(king, checkers, board)
+        moves_to_evaluate = [(move, calculate_move_value(move, board)) for move in (next(generator) + next(generator)) if board._is_safe(king, blockers, move)]
+    else:
+        moves_to_evaluate = [(move, calculate_move_value(move, board)) for move in next(_generate_ordered_pseudo_legal_moves(board)) if board._is_safe(king, blockers, move)]
+    
+    moves_to_evaluate.sort(key=lambda x: x[1], reverse=True)
+    return moves_to_evaluate
 
 # @profile
 def generate_ordered_moves(board: chess.Board, hash: int, tt_killers: np.ndarray) -> Iterator[Tuple[chess.Move, int]]:
@@ -41,7 +40,6 @@ def generate_ordered_moves(board: chess.Board, hash: int, tt_killers: np.ndarray
 
     for move in sorted_moves:
         yield move
-
 
 # @profile
 def generate_ordered_legal_moves(board: chess.Board, killer_move: Optional[chess.Move] = None) -> Iterator[Tuple[chess.Move, int]]:
@@ -73,6 +71,17 @@ def generate_ordered_legal_moves(board: chess.Board, killer_move: Optional[chess
     legal_other_moves.sort(key=lambda x: x[1], reverse=True)
     for legal_other_move in legal_other_moves:
         yield legal_other_move
+
+def _checkers_mask(board: chess.Board) -> chess.Bitboard:
+    king = _king(board, board.turn)
+    return board.attackers_mask(not board.turn, king)
+
+def is_check(board: chess.Board()) -> bool:
+    return bool(_checkers_mask(board))
+
+def _king(board: chess.Board, color: chess.Color) -> chess.Square:
+    king_mask = board.occupied_co[color] & board.kings
+    return chess.msb(king_mask)
 
 def _generate_ordered_evasions(king: chess.Square, checkers: chess.Bitboard, board: chess.Board) -> Iterator[List[chess.Move]]:
     captures = []

@@ -65,10 +65,10 @@ def capture_in_one():
 
 def captured_in_one():
     for depth in range(2, 7):
-        board = chess.Board('1k6/8/8/8/8/8/2n5/R3K3 w - - 0 1')
+        board = chess.Board('1k6/8/8/8/8/8/5n2/3R3K w - - 0 1')
         result = solve_and_filter(board, depth)
         assert result[1] < -150
-        board = chess.Board('r3k3/2N5/8/8/8/8/8/4K3 b - - 0 1')
+        board = chess.Board('3r3k/5N2/8/8/8/8/8/4K3 b - - 0 1')
         result = solve_and_filter(board, depth)
         assert result[1] < -150
 
@@ -76,6 +76,7 @@ def capture_in_two():
     for depth in range(3, 7):
         board = chess.Board('1K6/8/8/8/3N4/r7/8/4k3 w - - 0 1')
         result = solve_and_filter(board, depth)
+        print(result)
         assert str(result[0]) == 'd4c2'
         board = chess.Board('1k6/8/8/8/3n4/R7/8/4K3 b - - 0 1')
         result = solve_and_filter(board, depth)
@@ -108,17 +109,17 @@ def solve_and_filter(board, fixed_depth, game_id = None):
     return (move, score)
 
 if __name__ == '__main__':
-    start = time.perf_counter()
-    checkmate_in_one()
-    checkmated_in_one()
-    checkmate_in_two()
-    checkmated_in_two()
-    checkmate_in_three()
-    checkmated_in_three()
-    capture_in_one()
-    captured_in_one()
-    capture_in_two()
-    queen_sack()
-    print(f'total test time: {time.perf_counter() - start}')
+    # start = time.perf_counter()
+    # checkmate_in_one()
+    # checkmated_in_one()
+    # checkmate_in_two()
+    # checkmated_in_two()
+    # checkmate_in_three()
+    # checkmated_in_three()
+    # capture_in_one()
+    # captured_in_one()
+    # capture_in_two()
+    # queen_sack()
+    # print(f'total test time: {time.perf_counter() - start}')
 
     performance_test()

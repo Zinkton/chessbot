@@ -1,9 +1,6 @@
 from typing import Dict, Optional, Tuple
-import chess
 
-import numpy as np
-import constants
-from zobrist import zobrist_hash
+import custom_chess as chess
 
 
 def probe_tt_scores(tt_scores: Dict, hash: int) -> Optional[Tuple[int, int, int]]:
@@ -18,16 +15,3 @@ def probe_tt_killers(tt_killers: Dict, hash: int) -> Optional[chess.Move]:
     
 def save_tt_killer(tt_killers: Dict, move: chess.Move, hash: int):
     tt_killers[hash] = move
-
-if __name__ == '__main__':
-    board = chess.Board()
-    hash = zobrist_hash(board)
-    test_array = np.zeros((constants.TT_SIZE,), dtype=np.uint64)
-    save_tt_killer(test_array, chess.Move.from_uci('a7a8'), hash)
-    print(probe_tt_killers(test_array, hash))
-    test_array.fill(0)
-    save_tt_score(test_array, 3, board.turn, 1, None, hash, (2**20))
-    result = probe_tt_scores(test_array, hash)
-    print(result)
-    some_list = [0, 1, 2, 3, 4, 5, 6, 7, 8]
-    print(some_list[result[2] * 2])

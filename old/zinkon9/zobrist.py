@@ -1,9 +1,8 @@
 import random
-from typing import Callable, List, Optional
 import typing
+from typing import Callable, List
 
-import chess
-
+import custom_chess as chess
 
 POLYGLOT_RANDOM_ARRAY = [
     0x9D39247E33776D41, 0x2AF7398005AAA5C7, 0x44DB015024623547, 0x9C15F73E62A76AE2,
@@ -270,7 +269,7 @@ def zobrist_hash(board: chess.Board, *, _hasher: Callable[[chess.Board], int] = 
     """
     return _hasher(board)
 
-def update_hash(hash: int, board: chess.Board, move: chess.Move, src_piece_type: Optional[chess.PieceType] = None):
+def update_hash(hash: int, board: chess.Board, move: chess.Move):
     # switch turn
     new_hash = hash ^ POLYGLOT_RANDOM_ARRAY[780]
     if board.ep_square is not None:

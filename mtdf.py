@@ -18,12 +18,16 @@ tt_scores = None
 tt_killers = None
 last_pos = None
 is_late_game = None
-def solve_position_root(board: chess.Board, game_id: UUID, min_depth: int = constants.MIN_DEPTH, max_depth: int = constants.MAX_DEPTH) -> Tuple[int, chess.Move, int]:
+start = None
+def solve_position_root(board: chess.Board, game_id: UUID, min_depth: int = constants.MIN_DEPTH, max_depth: int = constants.MAX_DEPTH) -> Tuple[chess.Move, int]:
     global current_game_id
     global tt_scores
     global tt_killers
     global last_pos
     global is_late_game
+    global start
+
+    start = time.perf_counter()
 
     if current_game_id != game_id:
         current_game_id = game_id
@@ -53,11 +57,10 @@ def solve_position_root(board: chess.Board, game_id: UUID, min_depth: int = cons
     return (move, score)
 
 def _iterative_deepening(root: MtdfNode, board: chess.Board, min_depth: int, max_depth: int, repetition_move: Optional[chess.Move] = None) -> Tuple[int, chess.Move, int]:
-    start = time.perf_counter()
     result = None
     for depth in range(1, max_depth + 1):
         if root.gamma is None or abs(root.gamma) < MAX_VALUE:
-            mtdf_result = _mtdf(root, depth, board, min_depth, repetition_move, start)
+            mtdf_result = _mtdf(root, depth, board, min_depth, repetition_move)
             if mtdf_result is not None:
                 result_move, result_score = mtdf_result
                 result = (depth, result_move, result_score)
@@ -66,7 +69,7 @@ def _iterative_deepening(root: MtdfNode, board: chess.Board, min_depth: int, max
         
     return result
 
-def _mtdf(root: MtdfNode, depth: int, board: chess.Board, min_depth: int, repetition_move: Optional[chess.Move] = None, start: Optional[float] = None) -> Tuple[chess.Move, int]:
+def _mtdf(root: MtdfNode, depth: int, board: chess.Board, min_depth: int, repetition_move: Optional[chess.Move] = None) -> Tuple[chess.Move, int]:
     pos_result = probe_tt_scores(tt_scores, root.hash)
     if root.gamma is None:
         if pos_result is not None and pos_result[2] == constants.EXACT:
@@ -78,7 +81,7 @@ def _mtdf(root: MtdfNode, depth: int, board: chess.Board, min_depth: int, repeti
     lower_bound = -MAX_VALUE - depth
     
     while upper_bound - lower_bound > 0:
-        if depth > min_depth and start and time.perf_counter() - start >= SECONDS_PER_MOVE:
+        if depth > min_depth and time.perf_counter() - start >= SECONDS_PER_MOVE:
             return None
         
         beta = root.gamma + 1 if root.gamma == lower_bound else root.gamma
@@ -97,7 +100,6 @@ def _mtdf(root: MtdfNode, depth: int, board: chess.Board, min_depth: int, repeti
 # @profile
 def _evaluate_child(value: int, parent_hash: int, move: chess.Move, depth_left: int, alpha: int, beta: int, board: chess.Board, best_score: Tuple[Optional[chess.Move], int], repetition_move: Optional[chess.Move] = None) -> Tuple[int, int, int, Tuple[Optional[chess.Move], int]]:
     if repetition_move is not None and repetition_move.from_square == move.from_square and repetition_move.to_square == move.to_square:
-        print('repetition detected')
         score = 0
         if score >= beta:
             return score, alpha, beta, (None, score) # fail-soft beta-cutoff

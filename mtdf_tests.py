@@ -118,7 +118,7 @@ if __name__ == '__main__':
     # capture_in_one()
     # captured_in_one()
     # capture_in_two()
-    queen_sack()
+    # queen_sack()
     # print(f'total test time: {time.perf_counter() - start}')
 
-    # performance_test()
+    performance_test()

@@ -1,6 +1,6 @@
 from typing import Dict, List
-import chess, random, time
-import custom_chess
+import uuid
+import custom_chess as chess
 import numpy as np
 import constants
 from chess_node import MtdfNode
@@ -112,4 +112,5 @@ from evaluation import calculate_move_value, evaluate_board
 # print(f"Unpacked values: d = {d}, s = {s}, t = {t}")
 
 if __name__ == '__main__':
-    print(evaluate_board(chess.Board('k7/8/8/8/8/1K6/8/8 w - - 0 1')))
+    board = chess.Board('r3k2r/p4ppp/Q1p1pn2/4N3/1b1PP2q/1pN5/1P3PPP/2B1KB1R b Kkq - 0 14')
+    print(solve_position_root(board, uuid.uuid4()))

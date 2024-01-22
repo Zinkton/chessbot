@@ -8,7 +8,7 @@ from mtdf import solve_position_root
 
 
 def checkmate_in_one():
-    for depth in range(2, 7):
+    for depth in range(1, 7):
         board = chess.Board('4k3/Q7/5P2/8/8/5p2/q7/4K3 w - - 0 1')
         result = solve_and_filter(board, depth)
         assert str(result[0]) == 'a7e7' and result[1] == MAX_VALUE
@@ -17,7 +17,7 @@ def checkmate_in_one():
         assert str(result[0]) == 'a2e2' and result[1] == MAX_VALUE
 
 def checkmated_in_one():
-    for depth in range(3, 7):
+    for depth in range(2, 7):
         board = chess.Board('4k3/8/8/8/8/1r6/r7/4K3 w - - 0 1')
         result = solve_and_filter(board, depth)
         assert result[1] <= -MAX_VALUE
@@ -26,7 +26,7 @@ def checkmated_in_one():
         assert result[1] <= -MAX_VALUE
 
 def checkmate_in_two():
-    for depth in range(4, 7):
+    for depth in range(3, 7):
         board = chess.Board('7k/8/RR6/8/8/8/8/4K3 w - - 0 1')
         result = solve_and_filter(board, depth)
         assert (str(result[0]) == 'a6a7' or str(result[0]) == 'b6b7') and result[1] == MAX_VALUE
@@ -35,7 +35,7 @@ def checkmate_in_two():
         assert (str(result[0]) == 'a3a2' or str(result[0]) == 'b3b2') and result[1] == MAX_VALUE
 
 def checkmated_in_two():
-    for depth in range(5, 7):
+    for depth in range(4, 7):
         board = chess.Board('7k/8/RR6/8/8/8/8/4K3 b - - 0 1')
         result = solve_and_filter(board, depth)
         assert result[1] <= -MAX_VALUE
@@ -44,14 +44,14 @@ def checkmated_in_two():
         assert result[1] <= -MAX_VALUE
 
 def checkmate_in_three():
-    for depth in range(6, 7):
+    for depth in range(5, 7):
         board = chess.Board('r4r2/1R1R2pk/7p/8/8/5Ppq/P7/6K1 w - - 0 1')
         result = solve_and_filter(board, depth)
         assert str(result[0]) == 'd7g7'
 
 def checkmated_in_three():
     board = chess.Board('r4r1k/1R1R2pQ/7p/8/8/5Ppq/P7/6K1 b - - 0 1')
-    result = solve_and_filter(board, 7)
+    result = solve_and_filter(board, 6)
     assert result[1] <= -MAX_VALUE
 
 def capture_in_one():
@@ -76,7 +76,6 @@ def capture_in_two():
     for depth in range(3, 7):
         board = chess.Board('1K6/8/8/8/3N4/r7/8/4k3 w - - 0 1')
         result = solve_and_filter(board, depth)
-        print(result)
         assert str(result[0]) == 'd4c2'
         board = chess.Board('1k6/8/8/8/3n4/R7/8/4K3 b - - 0 1')
         result = solve_and_filter(board, depth)
@@ -119,7 +118,7 @@ if __name__ == '__main__':
     # capture_in_one()
     # captured_in_one()
     # capture_in_two()
-    # queen_sack()
+    queen_sack()
     # print(f'total test time: {time.perf_counter() - start}')
 
-    performance_test()
+    # performance_test()

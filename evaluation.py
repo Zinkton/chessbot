@@ -1,3 +1,4 @@
+from typing import Optional, Tuple
 import custom_chess as chess
 from constants import MAX_VALUE
 
@@ -10,6 +11,9 @@ piece_value = {
     chess.QUEEN: 929,
     chess.KING: MAX_VALUE
 }
+
+delta_pruning_delta = chess.PAWN * 2
+promotion_queen = piece_value[chess.QUEEN] * 2 - delta_pruning_delta
 
 # Position tables for each piece type
 pawn_table = [ 100, 100, 100, 100, 105, 100, 100,  100,
@@ -60,6 +64,16 @@ king_table = [  4,  54,  47, -99, -99,  60,  83, -62,
 -47, -42, -43, -79, -64, -32, -29, -32,
  -4,   3, -14, -50, -57, -18,  13,   4,
  17,  30,  -3, -14,   6,  -1,  40,  18]
+king_table_endgame = [
+            -50, -40, -30, -20, -20, -30, -40, -50,
+            -30, -20, -10,   0,   0, -10, -20, -30,
+            -30, -10,  20,  30,  30,  20, -10, -30,
+            -30, -10,  30,  40,  40,  30, -10, -30,
+            -30, -10,  30,  40,  40,  30, -10, -30,
+            -30, -10,  20,  30,  30,  20, -10, -30,
+            -30, -30,   0,   0,   0,   0, -30, -30,
+            -50, -30, -30, -30, -30, -30, -30, -50
+        ]
 
 def _invert_columns(table):
     result = table[::-1]
@@ -91,6 +105,15 @@ position_value = {
 K_CASTLING_VALUE = position_value[chess.WHITE][chess.ROOK][chess.F1] - position_value[chess.WHITE][chess.ROOK][chess.H1] + position_value[chess.WHITE][chess.KING][chess.G1] - position_value[chess.WHITE][chess.KING][chess.E1]
 Q_CASTLING_VALUE = position_value[chess.WHITE][chess.ROOK][chess.D1] - position_value[chess.WHITE][chess.ROOK][chess.A1] + position_value[chess.WHITE][chess.KING][chess.C1] - position_value[chess.WHITE][chess.KING][chess.E1]
 
+def set_king_position_values(lategame: bool):
+    global position_value
+    if lategame:
+        position_value[chess.WHITE][chess.KING] = _invert_columns(king_table_endgame.copy())
+        position_value[chess.BLACK][chess.KING] = king_table_endgame.copy()
+    else:
+        position_value[chess.WHITE][chess.KING] = _invert_columns(king_table.copy())
+        position_value[chess.BLACK][chess.KING] = king_table.copy()
+
 def calculate_move_value(move: chess.Move, board: chess.Board):
     castle_value = _check_castling(board, move)
     if castle_value is not None:
@@ -118,6 +141,38 @@ def calculate_move_value(move: chess.Move, board: chess.Board):
 
     return value
 
+def calculate_move_value_quiescence(move: chess.Move, board: chess.Board):
+    castle_value = _check_castling(board, move)
+    if castle_value is not None:
+        return castle_value
+    
+    value = 0
+    src_piece = board.piece_type_at(move.from_square)
+    dest_piece = board.piece_type_at(move.to_square)
+
+    src_piece_value = piece_value[src_piece]
+    dest_piece_value = None
+    
+    if move.promotion:
+        prom = move.promotion
+        pos_score = position_value[board.turn][prom][move.to_square] - position_value[board.turn][src_piece][move.from_square]
+        prom_score = piece_value[prom] - src_piece_value
+        value = pos_score + prom_score
+    else:
+        value = position_value[board.turn][src_piece][move.to_square] - position_value[board.turn][src_piece][move.from_square]
+
+    if dest_piece:
+        # If we capture, add score based on captured piece value and position value
+        dest_piece_value = piece_value[dest_piece]
+        value += dest_piece_value + position_value[not board.turn][dest_piece][move.to_square]
+    elif src_piece == chess.PAWN and move.to_square == board.ep_square:
+        down = -8 if board.turn == chess.WHITE else 8
+        capture_square = board.ep_square + down
+        dest_piece_value = piece_value[chess.PAWN]
+        value += dest_piece_value + position_value[not board.turn][chess.PAWN][capture_square]
+
+    return (value, src_piece_value, dest_piece_value)
+
 def _check_castling(board: chess.Board, move: chess.Move):
     if board.kings & chess.BB_SQUARES[move.from_square]:
         diff = chess.square_file(move.from_square) - chess.square_file(move.to_square)
@@ -135,3 +190,70 @@ def evaluate_board(board: chess.Board):
             score += (piece_value[piece.piece_type] + position_value[piece.color][piece.piece_type][square]) * sign
     
     return score
+
+def SEE(square: chess.Square, board: chess.Board, dest_piece_value: int) -> int:
+    value = 0
+    piece_value = get_smallest_attacker(board, square)
+    if piece_value is not None:
+        piece, src_piece_value = piece_value
+        board.push(chess.Move(piece, square))
+        value = max(0, dest_piece_value - SEE(square, board, src_piece_value))
+        board.pop()
+
+    return value
+
+def SEE_capture(move: chess.Move, board: chess.Board, src_piece_val: int, dest_piece_val: int):
+    value = 0
+    board.push(move)
+    value = dest_piece_val - SEE(move.to_square, board, src_piece_val)
+    board.pop()
+
+    return value
+
+def get_smallest_attacker(board: chess.Board, square: chess.Square) -> Optional[Tuple[chess.Square, int]]:
+    pawn_attackers = board.pawns & chess.BB_PAWN_ATTACKS[not board.turn][square] & board.occupied_co[board.turn]
+    if pawn_attackers:
+        return (chess.msb(pawn_attackers), piece_value[chess.PAWN])
+
+    knight_attackers = board.knights & chess.BB_KNIGHT_ATTACKS[square] & board.occupied_co[board.turn]
+    if knight_attackers:
+        return (chess.msb(knight_attackers), piece_value[chess.KNIGHT])
+    
+    diag_pieces = chess.BB_DIAG_MASKS[square] & board.occupied
+    bishop_attackers = board.bishops & chess.BB_DIAG_ATTACKS[square][diag_pieces] & board.occupied_co[board.turn]
+    if bishop_attackers:
+        return (chess.msb(bishop_attackers), piece_value[chess.BISHOP])
+    
+    rank_pieces = chess.BB_RANK_MASKS[square] & board.occupied
+    rook_attackers = board.rooks & chess.BB_RANK_ATTACKS[square][rank_pieces]
+    if rook_attackers:
+        return (chess.msb(rook_attackers), piece_value[chess.ROOK])
+    file_pieces = chess.BB_FILE_MASKS[square] & board.occupied
+    rook_attackers = board.rooks & chess.BB_FILE_ATTACKS[square][file_pieces]
+    if rook_attackers:
+        return (chess.msb(rook_attackers), piece_value[chess.ROOK])
+
+    queen_attackers = board.queens & chess.BB_RANK_ATTACKS[square][rank_pieces]
+    if queen_attackers:
+        return (chess.msb(queen_attackers), piece_value[chess.QUEEN])
+    queen_attackers = board.queens & chess.BB_FILE_ATTACKS[square][file_pieces]
+    if queen_attackers:
+        return (chess.msb(queen_attackers), piece_value[chess.QUEEN])
+    queen_attackers = board.queens & chess.BB_DIAG_ATTACKS[square][diag_pieces]
+    if queen_attackers:
+        return (chess.msb(queen_attackers), piece_value[chess.QUEEN])
+    
+    king_attackers = board.kings & chess.BB_KING_ATTACKS[square]
+    if king_attackers:
+        return (chess.msb(king_attackers), piece_value[chess.KING])
+    
+    return None
+
+def get_total_material(board: chess.Board):
+    material = 0
+    for square in range(64):
+        piece = board.piece_at(square)
+        if piece and piece != chess.KING:
+            material += piece_value[piece.piece_type]
+    
+    return material

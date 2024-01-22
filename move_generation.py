@@ -4,7 +4,7 @@ import numpy as np
 
 import custom_chess as chess
 from chess_node import MtdfNode
-from evaluation import calculate_move_value
+from evaluation import calculate_move_value, calculate_move_value_quiescence
 from tt_utilities_dict import probe_tt_killers
 
 # @profile
@@ -14,17 +14,17 @@ def is_checkmate(board: chess.Board) -> bool:
     
     return not any(board.generate_legal_moves())
 
-def generate_quiescence_moves(board: chess.Board) -> List[Tuple[chess.Move, int]]:
-    king_mask = board.kings & board.occupied_co[board.turn]
-    king = chess.msb(king_mask)
+def generate_sorted_evasions(board: chess.Board, king: int, checkers: chess.Bitboard) -> List[Tuple[chess.Move, int]]:
     blockers = board._slider_blockers(king)
-    checkers = board.attackers_mask(not board.turn, king)
-    moves_to_evaluate = None
-    if checkers:
-        generator = _generate_ordered_evasions(king, checkers, board)
-        moves_to_evaluate = [(move, calculate_move_value(move, board)) for move in (next(generator) + next(generator)) if board._is_safe(king, blockers, move)]
-    else:
-        moves_to_evaluate = [(move, calculate_move_value(move, board)) for move in next(_generate_ordered_pseudo_legal_moves(board)) if board._is_safe(king, blockers, move)]
+    generator = _generate_ordered_evasions(king, checkers, board)
+    moves_to_evaluate = [(move, calculate_move_value(move, board)) for move in (next(generator) + next(generator)) if board._is_safe(king, blockers, move)]
+    
+    moves_to_evaluate.sort(key=lambda x: x[1], reverse=True)
+    return moves_to_evaluate
+
+def generate_quiescence_moves(board: chess.Board, king: int) -> List[Tuple[chess.Move, int]]:
+    blockers = board._slider_blockers(king)
+    moves_to_evaluate = [(move, calculate_move_value_quiescence(move, board)) for move in next(_generate_ordered_pseudo_legal_moves(board)) if board._is_safe(king, blockers, move)]
     
     moves_to_evaluate.sort(key=lambda x: x[1], reverse=True)
     return moves_to_evaluate

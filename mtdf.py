@@ -8,8 +8,8 @@ import constants
 import custom_chess as chess
 from chess_node import MtdfNode
 from constants import MAX_VALUE, SECONDS_PER_MOVE
-from evaluation import evaluate_board
-from move_generation import generate_ordered_moves, generate_quiescence_moves, is_check
+from evaluation import SEE_capture, evaluate_board, get_total_material, set_king_position_values, piece_value, promotion_queen, delta_pruning_delta
+from move_generation import generate_ordered_moves, generate_sorted_evasions, generate_quiescence_moves, is_check
 from tt_utilities_dict import probe_tt_scores, save_tt_killer, save_tt_score
 from zobrist import update_hash, zobrist_hash
 
@@ -17,36 +17,47 @@ current_game_id = None
 tt_scores = None
 tt_killers = None
 last_pos = None
+is_late_game = None
 def solve_position_root(board: chess.Board, game_id: UUID, min_depth: int = constants.MIN_DEPTH, max_depth: int = constants.MAX_DEPTH) -> Tuple[int, chess.Move, int]:
     global current_game_id
     global tt_scores
     global tt_killers
     global last_pos
+    global is_late_game
 
     if current_game_id != game_id:
         current_game_id = game_id
         tt_scores = {}
         tt_killers = {}
         last_pos = {chess.WHITE: deque(maxlen=2), chess.BLACK: deque(maxlen=2)}
+        is_late_game = False
+
+    if not is_late_game:
+        if get_total_material(board) < 1500:
+            is_late_game = True
+            tt_scores = {}
+            set_king_position_values(True)
+        else:
+            set_king_position_values(False)
 
     initial_value = -evaluate_board(board) if board.turn else evaluate_board(board)
     root_node = MtdfNode(move=None, value=initial_value, hash=zobrist_hash(board))
 
     repetition_move = last_pos[board.turn][0][1] if len(last_pos[board.turn]) == 2 and last_pos[board.turn][0][0] == root_node.hash else None
 
-    depth, move, score = _iterative_deepening(root_node, board, tt_scores, tt_killers, min_depth, max_depth, repetition_move)
+    depth, move, score = _iterative_deepening(root_node, board, min_depth, max_depth, repetition_move)
 
     last_pos[board.turn].append((root_node.hash, move))
-    print(f'depth: {depth}')
+    print(f'depth: {depth}, score: {score}')
 
     return (move, score)
 
-def _iterative_deepening(root: MtdfNode, board: chess.Board, tt_scores, tt_killers, min_depth: int, max_depth: int, repetition_move: Optional[chess.Move] = None) -> Tuple[int, chess.Move, int]:
+def _iterative_deepening(root: MtdfNode, board: chess.Board, min_depth: int, max_depth: int, repetition_move: Optional[chess.Move] = None) -> Tuple[int, chess.Move, int]:
     start = time.perf_counter()
     result = None
     for depth in range(1, max_depth + 1):
         if root.gamma is None or abs(root.gamma) < MAX_VALUE:
-            mtdf_result = _mtdf(root, depth, board, tt_scores, tt_killers, min_depth, repetition_move, start)
+            mtdf_result = _mtdf(root, depth, board, min_depth, repetition_move, start)
             if mtdf_result is not None:
                 result_move, result_score = mtdf_result
                 result = (depth, result_move, result_score)
@@ -55,7 +66,7 @@ def _iterative_deepening(root: MtdfNode, board: chess.Board, tt_scores, tt_kille
         
     return result
 
-def _mtdf(root: MtdfNode, depth: int, board: chess.Board, tt_scores, tt_killers, min_depth: int, repetition_move: Optional[chess.Move] = None, start: Optional[float] = None) -> Tuple[chess.Move, int]:
+def _mtdf(root: MtdfNode, depth: int, board: chess.Board, min_depth: int, repetition_move: Optional[chess.Move] = None, start: Optional[float] = None) -> Tuple[chess.Move, int]:
     pos_result = probe_tt_scores(tt_scores, root.hash)
     if root.gamma is None:
         if pos_result is not None and pos_result[2] == constants.EXACT:
@@ -71,7 +82,7 @@ def _mtdf(root: MtdfNode, depth: int, board: chess.Board, tt_scores, tt_killers,
             return None
         
         beta = root.gamma + 1 if root.gamma == lower_bound else root.gamma
-        (best_move, root.gamma) = _alpha_beta(root.value, beta - 1, beta, depth, board, tt_scores, tt_killers, root.hash, repetition_move)
+        (best_move, root.gamma) = _alpha_beta(root.value, beta - 1, beta, depth, board, root.hash, repetition_move)
         
         if root.gamma < beta:
             upper_bound = root.gamma
@@ -84,7 +95,7 @@ def _mtdf(root: MtdfNode, depth: int, board: chess.Board, tt_scores, tt_killers,
     return best_move, root.gamma
 
 # @profile
-def _evaluate_child(value: int, parent_hash: int, move: chess.Move, depth_left: int, alpha: int, beta: int, board: chess.Board, best_score: Tuple[Optional[chess.Move], int], tt_scores, tt_killers, repetition_move: Optional[chess.Move] = None) -> Tuple[int, int, int, Tuple[Optional[chess.Move], int]]:
+def _evaluate_child(value: int, parent_hash: int, move: chess.Move, depth_left: int, alpha: int, beta: int, board: chess.Board, best_score: Tuple[Optional[chess.Move], int], repetition_move: Optional[chess.Move] = None) -> Tuple[int, int, int, Tuple[Optional[chess.Move], int]]:
     if repetition_move is not None and repetition_move.from_square == move.from_square and repetition_move.to_square == move.to_square:
         print('repetition detected')
         score = 0
@@ -115,7 +126,7 @@ def _evaluate_child(value: int, parent_hash: int, move: chess.Move, depth_left: 
     found_value = score is not None
     if not found_value:
         board.push(move)
-        (best_move, score) = _alpha_beta(value, -beta, -alpha, depth_left - 1, board, tt_scores, tt_killers, hash)
+        (best_move, score) = _alpha_beta(value, -beta, -alpha, depth_left - 1, board, hash)
         score = -score
         board.pop()
 
@@ -133,14 +144,14 @@ def _evaluate_child(value: int, parent_hash: int, move: chess.Move, depth_left: 
     return score, alpha, beta, best_score
 
 # @profile
-def _alpha_beta(value: int, alpha: int, beta: int, depth_left: int, board: chess.Board, tt_scores, tt_killers, hash: int, repetition_move: Optional[chess.Move] = None) -> Tuple[Optional[chess.Move], int]:
+def _alpha_beta(value: int, alpha: int, beta: int, depth_left: int, board: chess.Board, hash: int, repetition_move: Optional[chess.Move] = None) -> Tuple[Optional[chess.Move], int]:
     best_score = (None, -(MAX_VALUE + depth_left))
 
     if depth_left == 0:
         return (None, _quiescence(value, alpha, beta, board))
 
     for move, move_value in generate_ordered_moves(board, hash, tt_killers):
-        score, alpha, beta, best_score = _evaluate_child(move_value - value, hash, move, depth_left, alpha, beta, board, best_score, tt_scores, tt_killers, repetition_move)
+        score, alpha, beta, best_score = _evaluate_child(move_value - value, hash, move, depth_left, alpha, beta, board, best_score, repetition_move)
         if best_score[0] is None:
             save_tt_killer(tt_killers, move, hash)
             return (move, score) # fail-soft beta-cutoff
@@ -157,25 +168,66 @@ def _alpha_beta(value: int, alpha: int, beta: int, depth_left: int, board: chess
 # @profile
 def _quiescence(value: int, alpha: int, beta: int, board: chess.Board) -> int:
     stand_pat = -value
-    if stand_pat >= beta:
-        return stand_pat # fail soft beta cut-off
-    best_score = stand_pat
-    if stand_pat > alpha:
-        alpha = stand_pat
+    best_score = -MAX_VALUE
     
-    for move, move_value in generate_quiescence_moves(board):
-        board.push(move)
-        score = -_quiescence(stand_pat + move_value, -beta, -alpha, board)
-        board.pop()
+    king_mask = board.kings & board.occupied_co[board.turn]
+    king = chess.msb(king_mask)
 
-        if score >= beta:
-            return beta
-        if score > best_score:
-            best_score = score
-            if score > alpha:
-                alpha = score
+    checkers = board.attackers_mask(not board.turn, king)
+    if checkers:
+        move_found = False
+        for move, move_value in generate_sorted_evasions(board, king, checkers):
+            move_found = True
+            board.push(move)
+            score = -_quiescence(stand_pat + move_value, -beta, -alpha, board)
+            board.pop()
 
-    return best_score
+            if score >= beta:
+                return beta
+            if score > best_score:
+                best_score = score
+                if score > alpha:
+                    alpha = score
+        
+        if not move_found:
+            return -MAX_VALUE
+        
+        return best_score
+    else:
+        if stand_pat >= beta:
+            return stand_pat # fail soft beta cut-off
+        
+        if not is_late_game:
+            big_delta = piece_value[chess.QUEEN] if not _is_promoting_pawn(board) else promotion_queen
+            if stand_pat < alpha - big_delta:
+                return stand_pat
+
+        best_score = stand_pat
+        if stand_pat > alpha:
+            alpha = stand_pat
+
+        for move, move_value_src_dest in generate_quiescence_moves(board, king):
+            move_value, src_piece_val, dest_piece_val = move_value_src_dest
+            new_value = stand_pat + move_value
+            if not is_late_game and new_value < alpha - delta_pruning_delta:
+                continue
+                
+            if move.promotion or SEE_capture(move, board, src_piece_val, dest_piece_val) >= 0:
+                board.push(move)
+                score = -_quiescence(new_value, -beta, -alpha, board)
+                board.pop()
+
+                if score >= beta:
+                    return beta
+                if score > best_score:
+                    best_score = score
+                    if score > alpha:
+                        alpha = score
+
+        return best_score
+
+def _is_promoting_pawn(board: chess.Board):
+    board.pawns & board.occupied_co[board.turn] & (chess.BB_RANK_7 if board.turn else chess.BB_RANK_2)
 
 if __name__ == '__main__':
     # for x in range(1000):

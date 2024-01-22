@@ -25,7 +25,7 @@ class ChessBot():
                 return move
 
         board = Board(fen)
-        _, move, _ = solve_position_root(board, self.game_id) if not isCasual else solve_position_root(board, self.game_id, 0, depth)
+        move, _ = solve_position_root(board, self.game_id) if not isCasual else solve_position_root(board, self.game_id, 0, depth)
         
         if isCasual and perf_counter() - start < 2.0:
             sleep(2.0 - (perf_counter() - start))

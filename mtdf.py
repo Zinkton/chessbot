@@ -85,7 +85,6 @@ def _mtdf(root: MtdfNode, depth: int, board: chess.Board, repetition_move: Optio
     lower_bound = -MAX_VALUE - depth
 
     while upper_bound - lower_bound > 0:
-        root.gamma = (upper_bound + lower_bound + 1) // 2
         beta = root.gamma + 1 if root.gamma == lower_bound else root.gamma
         (best_move, root.gamma) = _alpha_beta(root.value, beta - 1, beta, depth, board, root.hash, repetition_move)
         
@@ -106,18 +105,17 @@ def _evaluate_child(value: int, parent_hash: int, move: chess.Move, depth_left: 
         if score >= beta:
             return score, alpha, beta, (None, score) # fail-soft beta-cutoff
         
-        if score > alpha:
-            alpha = score
-            
         if score > best_score[1]:
             best_score = (move, score)
+            if score > alpha:
+                alpha = score
 
         return score, alpha, beta, best_score
 
     hash = update_hash(parent_hash, board, move)
-    saved_value = probe_tt_scores(tt_scores, hash)
     score = None
-    
+
+    saved_value = probe_tt_scores(tt_scores, hash)
     if saved_value is not None and saved_value[0] >= depth_left: # no touching
         _, saved_score, node_type = saved_value
         saved_score = saved_score if board.turn else -saved_score
@@ -128,16 +126,12 @@ def _evaluate_child(value: int, parent_hash: int, move: chess.Move, depth_left: 
             score = saved_score
         elif node_type == constants.UPPERBOUND and saved_score < beta:
             score = saved_score
-    found_value = score is not None
-    if not found_value:
+
+    if score is None:
         board.push(move)
         (best_move, score) = _alpha_beta(value, -beta, -alpha, depth_left - 1, board, hash)
         score = -score
-        # if len(board.move_stack) == 5 and str(board.move_stack[0]) == 'c2d2' and score == MAX_VALUE:
-        #     print('not found', board.move_stack)
         board.pop()
-    # elif len(board.move_stack) == 4 and str(board.move_stack[0]) == 'c2d2' and score == MAX_VALUE:
-    #     print('found', board.move_stack)
 
     if score >= beta:
         save_tt_score(tt_scores, depth_left, board.turn, constants.LOWERBOUND, saved_value, hash, score)
@@ -155,7 +149,7 @@ def _evaluate_child(value: int, parent_hash: int, move: chess.Move, depth_left: 
 # @profile
 def _alpha_beta(value: int, alpha: int, beta: int, depth_left: int, board: chess.Board, hash: int, repetition_move: Optional[chess.Move] = None) -> Tuple[Optional[chess.Move], int]:
     if depth_left == 0:
-        return (None, _quiescence(value, alpha, beta, board))
+        return (None, _quiescence(value, alpha, beta, board, True))
     
     best_score = (None, -(MAX_VALUE + depth_left - 1))
 
@@ -171,16 +165,17 @@ def _alpha_beta(value: int, alpha: int, beta: int, depth_left: int, board: chess
     return best_score
 
 # @profile
-def _quiescence(value: int, alpha: int, beta: int, board: chess.Board) -> int:
+def _quiescence(value: int, alpha: int, beta: int, board: chess.Board, first_call: bool = False) -> int:
     stand_pat = -value
     
     king_mask = board.kings & board.occupied_co[board.turn]
     king = chess.msb(king_mask)
-
     checkers = board.attackers_mask(not board.turn, king)
+
     if checkers:
         best_score = -MAX_VALUE
 
+        score = None
         for move, move_value in generate_sorted_evasions(board, king, checkers):                
             board.push(move)
             score = -_quiescence(stand_pat + move_value, -beta, -alpha, board)
@@ -192,6 +187,9 @@ def _quiescence(value: int, alpha: int, beta: int, board: chess.Board) -> int:
                 best_score = score
                 if score > alpha:
                     alpha = score
+
+        if not first_call and best_score == -MAX_VALUE:
+            return score if score is not None else stand_pat
         
         return best_score
     else:

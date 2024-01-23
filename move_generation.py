@@ -36,7 +36,6 @@ def generate_ordered_moves(board: chess.Board, hash: int, tt_killers: np.ndarray
         yield (killer_move, calculate_move_value(killer_move, board))
 
     sorted_moves = generate_ordered_legal_moves(board, killer_move)
-    # sorted_moves = _sorted_evaluated_legal_moves(board)
 
     for move in sorted_moves:
         yield move

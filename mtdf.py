@@ -61,7 +61,7 @@ def _iterative_deepening(root: MtdfNode, board: chess.Board, min_depth: int, max
     for depth in range(1, max_depth + 1):
         if root.gamma is not None and abs(root.gamma) >= MAX_VALUE:
             break
-        if time.perf_counter() - start >= (SECONDS_PER_MOVE - 1.5) and depth > min_depth:
+        if time.perf_counter() - start >= (SECONDS_PER_MOVE - 2.5) and depth > min_depth:
             break
         mtdf_result = _mtdf(root, depth, board, min_depth, repetition_move)
         if mtdf_result is not None:
@@ -83,10 +83,7 @@ def _mtdf(root: MtdfNode, depth: int, board: chess.Board, min_depth: int, repeti
     upper_bound = MAX_VALUE + depth
     lower_bound = -MAX_VALUE - depth
 
-    while upper_bound - lower_bound > 0:
-        if depth > min_depth and time.perf_counter() - start >= SECONDS_PER_MOVE:
-            return None
-        
+    while upper_bound - lower_bound > 0:        
         beta = root.gamma + 1 if root.gamma == lower_bound else root.gamma
         (best_move, root.gamma) = _alpha_beta(root.value, beta - 1, beta, depth, board, root.hash, repetition_move)
         

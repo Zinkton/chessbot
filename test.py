@@ -106,11 +106,21 @@ from mtdf import solve_position_root
 # print(f"Unpacked values: d = {d}, s = {s}, t = {t}")
 
 if __name__ == '__main__':
-    board = chess.Board('r3k2r/p4ppp/Q1p1pn2/4N3/1b1PP2q/1pN5/1P3PPP/2B1KB1R b Kkq - 0 14')
+    board = chess.Board('8/8/8/8/p5Q1/4k3/1P6/1K6 w - - 3 69')
     game_id = uuid.uuid4()
-    start = time.perf_counter()
-    for x in range(5):
-        board.push(solve_position_root(board, game_id, 6, 7)[0])
-        board.push(list(board.legal_moves)[0])
+    result = solve_position_root(board, game_id, 6)
+    board.push(result[0])
+    print(result)
+    result = solve_position_root(board, game_id, 6)
+    board.push(result[0])
+    print(result)
+    result = solve_position_root(board, game_id, 6)
+    board.push(result[0])
+    print(result)
+    # start = time.perf_counter()
+    # for x in range(5):
+    #     result = solve_position_root(board, game_id, 6)
+    #     print(result)
+    #     board.push(result[0])
 
-    print(time.perf_counter() - start)
+    # print(time.perf_counter() - start)

@@ -250,10 +250,14 @@ def get_smallest_attacker(board: chess.Board, square: chess.Square) -> Optional[
     return None
 
 def get_total_material(board: chess.Board):
-    material = 0
+    white_material = 0
+    black_material = 0
     for square in range(64):
         piece = board.piece_at(square)
         if piece and piece != chess.KING:
-            material += piece_value[piece.piece_type]
+            if piece.color:
+                white_material += piece_value[piece.piece_type]
+            else:
+                black_material += piece_value[piece.piece_type]
     
-    return material
+    return min(white_material, black_material)

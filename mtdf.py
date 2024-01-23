@@ -37,7 +37,7 @@ def solve_position_root(board: chess.Board, game_id: UUID, min_depth: int = cons
         is_late_game = False
 
     if not is_late_game:
-        if get_total_material(board) < 1500:
+        if get_total_material(board) <= 750:
             is_late_game = True
             tt_scores = {}
             set_king_position_values(True)
@@ -59,11 +59,14 @@ def solve_position_root(board: chess.Board, game_id: UUID, min_depth: int = cons
 def _iterative_deepening(root: MtdfNode, board: chess.Board, min_depth: int, max_depth: int, repetition_move: Optional[chess.Move] = None) -> Tuple[int, chess.Move, int]:
     result = None
     for depth in range(1, max_depth + 1):
-        if root.gamma is None or abs(root.gamma) < MAX_VALUE: # or depth <= 4:
-            mtdf_result = _mtdf(root, depth, board, min_depth, repetition_move)
-            if mtdf_result is not None:
-                result_move, result_score = mtdf_result
-                result = (depth, result_move, result_score)
+        if root.gamma is not None and abs(root.gamma) >= MAX_VALUE:
+            break
+        if time.perf_counter() - start >= (SECONDS_PER_MOVE - 1.5) and depth > min_depth:
+            break
+        mtdf_result = _mtdf(root, depth, board, min_depth, repetition_move)
+        if mtdf_result is not None:
+            result_move, result_score = mtdf_result
+            result = (depth, result_move, result_score)
         else:
             break
         
@@ -79,7 +82,7 @@ def _mtdf(root: MtdfNode, depth: int, board: chess.Board, min_depth: int, repeti
 
     upper_bound = MAX_VALUE + depth
     lower_bound = -MAX_VALUE - depth
-    
+
     while upper_bound - lower_bound > 0:
         if depth > min_depth and time.perf_counter() - start >= SECONDS_PER_MOVE:
             return None

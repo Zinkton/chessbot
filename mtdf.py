@@ -33,7 +33,7 @@ def solve_position_root(board: chess.Board, game_id: UUID, min_depth: int = cons
         current_game_id = game_id
         tt_scores = {}
         tt_killers = {}
-        last_pos = {chess.WHITE: deque(maxlen=2), chess.BLACK: deque(maxlen=2)}
+        last_pos = {chess.WHITE: deque(), chess.BLACK: deque()}
         is_late_game = False
 
     if not is_late_game:
@@ -47,7 +47,8 @@ def solve_position_root(board: chess.Board, game_id: UUID, min_depth: int = cons
     initial_value = -evaluate_board(board) if board.turn else evaluate_board(board)
     root_node = MtdfNode(move=None, value=initial_value, hash=zobrist_hash(board))
 
-    repetition_move = last_pos[board.turn][0][1] if len(last_pos[board.turn]) == 2 and last_pos[board.turn][0][0] == root_node.hash else None
+    repetition_moves = [pos for pos in last_pos[board.turn] if pos[0] == root_node.hash]
+    repetition_move = repetition_moves[-1][1] if repetition_moves else None
 
     depth, move, score = _iterative_deepening(root_node, board, min_depth, max_depth, repetition_move)
 

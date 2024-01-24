@@ -8,9 +8,9 @@ import constants
 import custom_chess as chess
 from chess_node import MtdfNode
 from constants import MAX_VALUE, SECONDS_PER_MOVE
-from evaluation import SEE_capture, evaluate_board, get_total_material, set_king_position_values, piece_value, promotion_queen, delta_pruning_delta
-from move_generation import generate_ordered_moves, generate_sorted_evasions, generate_quiescence_moves, is_check
-from tt_utilities_dict import probe_tt_scores, save_tt_killer, save_tt_score
+from evaluation import SEE_capture, calculate_move_value, evaluate_board, get_total_material, set_king_position_values, piece_value, promotion_queen, delta_pruning_delta
+from move_generation import generate_ordered_legal_moves, generate_sorted_evasions, generate_quiescence_moves, is_check
+from tt_utilities_dict import probe_tt_killers, probe_tt_scores, save_tt_killer, save_tt_score
 from zobrist import update_hash, zobrist_hash
 
 current_game_id = None
@@ -19,6 +19,7 @@ tt_killers = None
 last_pos = None
 is_late_game = None
 start = None
+history = None
 def solve_position_root(board: chess.Board, game_id: UUID, min_depth: int = constants.MIN_DEPTH, max_depth: int = constants.MAX_DEPTH) -> Tuple[chess.Move, int]:
     global current_game_id
     global tt_scores
@@ -26,6 +27,7 @@ def solve_position_root(board: chess.Board, game_id: UUID, min_depth: int = cons
     global last_pos
     global is_late_game
     global start
+    global history
 
     start = time.perf_counter()
 
@@ -35,6 +37,7 @@ def solve_position_root(board: chess.Board, game_id: UUID, min_depth: int = cons
         tt_killers = {}
         last_pos = {chess.WHITE: deque(), chess.BLACK: deque()}
         is_late_game = False
+        history = {chess.WHITE: {}, chess.BLACK: {}}
 
     if not is_late_game:
         if get_total_material(board) <= 750:
@@ -153,16 +156,44 @@ def _alpha_beta(value: int, alpha: int, beta: int, depth_left: int, board: chess
     
     best_score = (None, -(MAX_VALUE + depth_left - 1))
 
-    for move, move_value in generate_ordered_moves(board, hash, tt_killers):
+    # Killer move
+    killer_move = probe_tt_killers(tt_killers, hash)
+    if killer_move is not None:
+        move_value = calculate_move_value(killer_move, board)
+        score, alpha, beta, best_score = _evaluate_child(move_value - value, hash, killer_move, depth_left, alpha, beta, board, best_score, repetition_move)
+        if best_score[0] is None:
+            return (killer_move, score) # fail-soft beta-cutoff
+
+    move_generator = generate_ordered_legal_moves(board, killer_move, history)
+
+    # Captures
+    for move, move_value in next(move_generator):
         score, alpha, beta, best_score = _evaluate_child(move_value - value, hash, move, depth_left, alpha, beta, board, best_score, repetition_move)
         if best_score[0] is None:
             save_tt_killer(tt_killers, move, hash)
+            return (move, score) # fail-soft beta-cutoff
+        
+    # Other moves
+    for move, move_value in next(move_generator):
+        score, alpha, beta, best_score = _evaluate_child(move_value - value, hash, move, depth_left, alpha, beta, board, best_score, repetition_move)
+        if best_score[0] is None:
+            save_tt_killer(tt_killers, move, hash)
+            update_history(move, depth_left, board.turn)
             return (move, score) # fail-soft beta-cutoff
 
     if best_score[0] is None:
         return (board.peek(), 0) if not is_check(board) else (board.peek(), best_score[1])
 
+    save_tt_killer(tt_killers, best_score[0], hash)
+
     return best_score
+
+def update_history(move: chess.Move, depth_left: int, turn: bool):
+    from_dict = history[turn].get(move.from_square, {})
+    to_value = from_dict.get(move.to_square, 0)
+    to_value += depth_left * depth_left
+    from_dict[move.to_square] = to_value
+    history[turn][move.from_square] = from_dict
 
 # @profile
 def _quiescence(value: int, alpha: int, beta: int, board: chess.Board, first_call: bool = False) -> int:

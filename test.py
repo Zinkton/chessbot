@@ -1,7 +1,10 @@
 import time
 import uuid
-import custom_chess as chess
-from mtdf import solve_position_root
+import custom_chess
+import chess
+import numpy as np
+# import custom_chess as chess
+# from mtdf import solve_position_root
 
 # def worker_function(args):
 #     shared_memory_name, index = args
@@ -106,11 +109,11 @@ from mtdf import solve_position_root
 # print(f"Unpacked values: d = {d}, s = {s}, t = {t}")
 
 if __name__ == '__main__':
-    board = chess.Board('R7/1p5p/2p2p1k/4pq2/8/8/4n1R1/7K b - - 7 55')
-    game_id = uuid.uuid4()
-    result = solve_position_root(board, game_id, 8)
-    board.push(result[0])
-    print(result)
+    # board = chess.Board('R7/1p5p/2p2p1k/4pq2/8/8/4n1R1/7K b - - 7 55')
+    # game_id = uuid.uuid4()
+    # result = solve_position_root(board, game_id, 8)
+    # board.push(result[0])
+    # print(result)
     # start = time.perf_counter()
     # for x in range(5):
     #     result = solve_position_root(board, game_id, 6)
@@ -118,3 +121,4 @@ if __name__ == '__main__':
     #     board.push(result[0])
 
     # print(time.perf_counter() - start)
+    new_board = custom_chess.Board()

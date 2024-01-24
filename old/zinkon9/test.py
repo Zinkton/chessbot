@@ -1,13 +1,7 @@
-from typing import Dict, List
-import chess, random, time
-import custom_chess
-import numpy as np
-import constants
-from chess_node import MtdfNode
-from move_generation import generate_ordered_legal_moves
+import time
+import uuid
+import custom_chess as chess
 from mtdf import solve_position_root
-from zobrist import zobrist_hash, update_hash
-from evaluation import calculate_move_value, evaluate_board
 
 # def worker_function(args):
 #     shared_memory_name, index = args
@@ -112,4 +106,15 @@ from evaluation import calculate_move_value, evaluate_board
 # print(f"Unpacked values: d = {d}, s = {s}, t = {t}")
 
 if __name__ == '__main__':
-    print(evaluate_board(chess.Board('k7/8/8/8/8/1K6/8/8 w - - 0 1')))
+    board = chess.Board('R7/1p5p/2p2p1k/4pq2/8/8/4n1R1/7K b - - 7 55')
+    game_id = uuid.uuid4()
+    result = solve_position_root(board, game_id, 8)
+    board.push(result[0])
+    print(result)
+    # start = time.perf_counter()
+    # for x in range(5):
+    #     result = solve_position_root(board, game_id, 6)
+    #     print(result)
+    #     board.push(result[0])
+
+    # print(time.perf_counter() - start)

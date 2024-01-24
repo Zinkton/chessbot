@@ -1,10 +1,10 @@
-from typing import Iterator, List, Optional, Tuple
+from typing import Dict, Iterator, List, Optional, Tuple
 
 import numpy as np
 
 import custom_chess as chess
 from chess_node import MtdfNode
-from evaluation import calculate_move_value
+from evaluation import calculate_move_value, calculate_move_value_quiescence
 from tt_utilities_dict import probe_tt_killers
 
 # @profile
@@ -14,35 +14,24 @@ def is_checkmate(board: chess.Board) -> bool:
     
     return not any(board.generate_legal_moves())
 
-def generate_quiescence_moves(board: chess.Board) -> List[Tuple[chess.Move, int]]:
-    king_mask = board.kings & board.occupied_co[board.turn]
-    king = chess.msb(king_mask)
+def generate_sorted_evasions(board: chess.Board, king: int, checkers: chess.Bitboard) -> List[Tuple[chess.Move, int]]:
     blockers = board._slider_blockers(king)
-    checkers = board.attackers_mask(not board.turn, king)
-    moves_to_evaluate = None
-    if checkers:
-        generator = _generate_ordered_evasions(king, checkers, board)
-        moves_to_evaluate = [(move, calculate_move_value(move, board)) for move in (next(generator) + next(generator)) if board._is_safe(king, blockers, move)]
-    else:
-        moves_to_evaluate = [(move, calculate_move_value(move, board)) for move in next(_generate_ordered_pseudo_legal_moves(board)) if board._is_safe(king, blockers, move)]
+    generator = _generate_ordered_evasions(king, checkers, board)
+    moves_to_evaluate = [(move, calculate_move_value(move, board)) for move in (next(generator) + next(generator)) if board._is_safe(king, blockers, move)]
     
     moves_to_evaluate.sort(key=lambda x: x[1], reverse=True)
     return moves_to_evaluate
 
-# @profile
-def generate_ordered_moves(board: chess.Board, hash: int, tt_killers: np.ndarray) -> Iterator[Tuple[chess.Move, int]]:
-    killer_move = probe_tt_killers(tt_killers, hash)
-    if killer_move is not None:
-        yield (killer_move, calculate_move_value(killer_move, board))
+def generate_quiescence_moves(board: chess.Board, king: int) -> List[Tuple[chess.Move, int]]:
+    blockers = board._slider_blockers(king)
+    moves_to_evaluate = [(move, calculate_move_value_quiescence(move, board)) for move in next(_generate_ordered_pseudo_legal_moves(board)) if board._is_safe(king, blockers, move)]
+    
+    moves_to_evaluate.sort(key=lambda x: x[1], reverse=True)
+    return moves_to_evaluate
 
-    sorted_moves = generate_ordered_legal_moves(board, killer_move)
-    # sorted_moves = _sorted_evaluated_legal_moves(board)
-
-    for move in sorted_moves:
-        yield move
 
 # @profile
-def generate_ordered_legal_moves(board: chess.Board, killer_move: Optional[chess.Move] = None) -> Iterator[Tuple[chess.Move, int]]:
+def generate_ordered_legal_moves(board: chess.Board, killer_move: Optional[chess.Move], history: Dict) -> Iterator[Tuple[chess.Move, int]]:
     king_mask = board.kings & board.occupied_co[board.turn]
     king = chess.msb(king_mask)
     blockers = board._slider_blockers(king)
@@ -57,8 +46,7 @@ def generate_ordered_legal_moves(board: chess.Board, killer_move: Optional[chess
         if board._is_safe(king, blockers, capture):
             legal_captures.append((capture, calculate_move_value(capture, board)))
     legal_captures.sort(key=lambda x: x[1], reverse=True)
-    for legal_capture in legal_captures:
-        yield legal_capture
+    yield legal_captures
     
     other_moves = next(generator)
     legal_other_moves = []
@@ -68,9 +56,8 @@ def generate_ordered_legal_moves(board: chess.Board, killer_move: Optional[chess
             continue
         if board._is_safe(king, blockers, other_move):
             legal_other_moves.append((other_move, calculate_move_value(other_move, board)))
-    legal_other_moves.sort(key=lambda x: x[1], reverse=True)
-    for legal_other_move in legal_other_moves:
-        yield legal_other_move
+    legal_other_moves.sort(key=lambda x: (history[board.turn].get(x[0].from_square, {}).get(x[0].to_square, 0), x[1]), reverse=True)
+    yield legal_other_moves
 
 def _checkers_mask(board: chess.Board) -> chess.Bitboard:
     king = _king(board, board.turn)

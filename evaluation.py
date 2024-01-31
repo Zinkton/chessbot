@@ -141,11 +141,7 @@ def calculate_move_value(move: chess.Move, board: chess.Board):
 
     return value
 
-def calculate_move_value_quiescence(move: chess.Move, board: chess.Board):
-    castle_value = _check_castling(board, move)
-    if castle_value is not None:
-        return castle_value
-    
+def calculate_move_value_quiescence(move: chess.Move, board: chess.Board):    
     value = 0
     src_piece = board.piece_type_at(move.from_square)
     dest_piece = board.piece_type_at(move.to_square)

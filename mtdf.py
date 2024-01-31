@@ -191,7 +191,7 @@ def _alpha_beta(value: int, alpha: int, beta: int, depth_left: int, board: chess
 def update_history(move: chess.Move, depth_left: int, turn: bool):
     from_dict = history[turn].get(move.from_square, {})
     to_value = from_dict.get(move.to_square, 0)
-    to_value += depth_left * depth_left
+    to_value += 1 << depth_left
     from_dict[move.to_square] = to_value
     history[turn][move.from_square] = from_dict
 
@@ -258,7 +258,7 @@ def _quiescence(value: int, alpha: int, beta: int, board: chess.Board, first_cal
         return best_score
 
 def _is_promoting_pawn(board: chess.Board):
-    board.pawns & board.occupied_co[board.turn] & (chess.BB_RANK_7 if board.turn else chess.BB_RANK_2)
+    return bool(board.pawns & board.occupied_co[board.turn] & (chess.BB_RANK_7 if board.turn else chess.BB_RANK_2))
 
 if __name__ == '__main__':
     # for x in range(1000):

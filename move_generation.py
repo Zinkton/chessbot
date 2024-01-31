@@ -1,11 +1,7 @@
 from typing import Dict, Iterator, List, Optional, Tuple
 
-import numpy as np
-
 import custom_chess as chess
-from chess_node import MtdfNode
 from evaluation import calculate_move_value, calculate_move_value_quiescence
-from tt_utilities_dict import probe_tt_killers
 
 # @profile
 def is_checkmate(board: chess.Board) -> bool:
@@ -126,7 +122,6 @@ def _generate_ordered_pseudo_legal_moves(board: chess.Board) -> Iterator[List[ch
 
             for to_square in chess.scan_reversed(targets):
                 captures_promotions.append(chess.Move(from_square, to_square, chess.QUEEN))
-                # Try comment the rook/bishop/knight?
                 # yield chess.Move(from_square, to_square, chess.ROOK)
                 # yield chess.Move(from_square, to_square, chess.BISHOP)
                 # yield chess.Move(from_square, to_square, chess.KNIGHT)

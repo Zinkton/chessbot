@@ -12,7 +12,7 @@ piece_value = {
     chess.KING: MAX_VALUE
 }
 
-delta_pruning_delta = chess.PAWN * 2
+delta_pruning_delta = piece_value[chess.PAWN] * 2
 promotion_queen = piece_value[chess.QUEEN] * 2 - delta_pruning_delta
 
 # Position tables for each piece type

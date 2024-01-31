@@ -2228,9 +2228,9 @@ class Board(BaseBoard):
         self.ep_square = None
 
         # Increment move counters.
-        # self.halfmove_clock += 1
-        # if self.turn == BLACK:
-        #     self.fullmove_number += 1
+        self.halfmove_clock += 1
+        if self.turn == BLACK:
+            self.fullmove_number += 1
 
         # On a null move, simply swap turns and reset the en passant square.
         if not move:
@@ -2244,8 +2244,8 @@ class Board(BaseBoard):
         #     return
 
         # Zero the half-move clock.
-        # if self.is_zeroing(move):
-        #     self.halfmove_clock = 0
+        if self.is_zeroing(move):
+            self.halfmove_clock = 0
 
         from_bb = BB_SQUARES[move.from_square]
         to_bb = BB_SQUARES[move.to_square]

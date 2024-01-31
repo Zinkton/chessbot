@@ -220,7 +220,7 @@ def _quiescence(value: int, alpha: int, beta: int, board: chess.Board, first_cal
                     alpha = score
 
         if not first_call and best_score == -MAX_VALUE:
-            return score if score is not None else stand_pat
+            return best_score // 2
         
         return best_score
     else:

@@ -10,10 +10,10 @@ def is_checkmate(board: chess.Board) -> bool:
     
     return not any(board.generate_legal_moves())
 
-def generate_sorted_evasions(board: chess.Board, king: int, checkers: chess.Bitboard) -> List[Tuple[chess.Move, int]]:
+def generate_sorted_evasions(board: chess.Board, king: int, checkers: chess.Bitboard) -> List[Tuple[chess.Move, Tuple[int, chess.PieceType, chess.PieceType]]]:
     blockers = board._slider_blockers(king)
     generator = _generate_ordered_evasions(king, checkers, board)
-    moves_to_evaluate = [(move, calculate_move_value(move, board)) for move in (next(generator) + next(generator)) if board._is_safe(king, blockers, move)]
+    moves_to_evaluate = [(move, calculate_move_value(move, board)[0]) for move in (next(generator) + next(generator)) if board._is_safe(king, blockers, move)]
     
     moves_to_evaluate.sort(key=lambda x: x[1], reverse=True)
     return moves_to_evaluate
@@ -27,7 +27,7 @@ def generate_quiescence_moves(board: chess.Board, king: int) -> List[Tuple[chess
 
 
 # @profile
-def generate_ordered_legal_moves(board: chess.Board, killer_move: Optional[chess.Move], history: Dict) -> Iterator[Tuple[chess.Move, int]]:
+def generate_ordered_legal_moves(board: chess.Board, killer_move: Optional[chess.Move], history: Dict) -> Iterator[Tuple[chess.Move, Tuple[int, chess.PieceType, chess.PieceType]]]:
     king_mask = board.kings & board.occupied_co[board.turn]
     king = chess.msb(king_mask)
     blockers = board._slider_blockers(king)
@@ -41,7 +41,7 @@ def generate_ordered_legal_moves(board: chess.Board, killer_move: Optional[chess
             continue
         if board._is_safe(king, blockers, capture):
             legal_captures.append((capture, calculate_move_value(capture, board)))
-    legal_captures.sort(key=lambda x: x[1], reverse=True)
+    legal_captures.sort(key=lambda x: x[1][0], reverse=True)
     yield legal_captures
     
     other_moves = next(generator)
@@ -52,7 +52,7 @@ def generate_ordered_legal_moves(board: chess.Board, killer_move: Optional[chess
             continue
         if board._is_safe(king, blockers, other_move):
             legal_other_moves.append((other_move, calculate_move_value(other_move, board)))
-    legal_other_moves.sort(key=lambda x: (history[board.turn].get(x[0].from_square, {}).get(x[0].to_square, 0), x[1]), reverse=True)
+    legal_other_moves.sort(key=lambda x: (history[board.turn].get(x[0].from_square, {}).get(x[0].to_square, 0), x[1][0]), reverse=True)
     yield legal_other_moves
 
 def _checkers_mask(board: chess.Board) -> chess.Bitboard:

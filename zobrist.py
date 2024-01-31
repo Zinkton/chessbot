@@ -3,6 +3,7 @@ import typing
 from typing import Callable, List
 
 import custom_chess as chess
+from evaluation import calculate_move_value
 
 POLYGLOT_RANDOM_ARRAY = [
     0x9D39247E33776D41, 0x2AF7398005AAA5C7, 0x44DB015024623547, 0x9C15F73E62A76AE2,
@@ -203,7 +204,6 @@ POLYGLOT_RANDOM_ARRAY = [
     0xF8D626AAAF278509
 ]
 
-
 class ZobristHasher:
     def __init__(self, array: List[int]) -> None:
         assert len(array) >= 781
@@ -269,19 +269,53 @@ def zobrist_hash(board: chess.Board, *, _hasher: Callable[[chess.Board], int] = 
     """
     return _hasher(board)
 
-def update_hash(hash: int, board: chess.Board, move: chess.Move):
+def get_castling_rights(board: chess.Board, color: chess.Color) -> bool:
+    """
+    Checks if the given side has kingside (that is h-side in Chess960)
+    castling rights.
+    """
+    backrank = chess.BB_RANK_1 if color == chess.WHITE else chess.BB_RANK_8
+    king_mask = board.kings & board.occupied_co[color] & backrank
+
+    kingside = False
+    queenside = False
+    castling_rights = board.clean_castling_rights() & backrank
+    while castling_rights:
+        rook = castling_rights & -castling_rights
+
+        if not kingside and rook > king_mask:
+            kingside = True
+            if queenside:
+                return (True, True)
+        
+        if not queenside and rook < king_mask:
+            queenside = True
+            if kingside:
+                return (True, True)
+
+        castling_rights &= castling_rights - 1
+
+    return kingside, queenside
+
+
+def update_hash(hash: int, board: chess.Board, move: chess.Move, src_piece_type: chess.PieceType, dest_piece_type: chess.PieceType):
     # switch turn
     new_hash = hash ^ POLYGLOT_RANDOM_ARRAY[780]
     if board.ep_square is not None:
         # remove ep_square
         new_hash ^= POLYGLOT_RANDOM_ARRAY[772 + chess.square_file(board.ep_square)]
-    src_piece_type = board.piece_type_at(move.from_square)
     piece_index = (src_piece_type - 1) * 2 + board.turn
     # Remove moved piece
     new_hash ^= POLYGLOT_RANDOM_ARRAY[64 * piece_index + move.from_square]
 
-    if board.kings & chess.BB_SQUARES[move.from_square]:
+    if src_piece_type == chess.KING:
         # King move
+        # Remove castling rights
+        (kingside, queenside) = get_castling_rights(board, board.turn)
+        if kingside:
+            new_hash ^= (POLYGLOT_RANDOM_ARRAY[768]) if board.turn else (POLYGLOT_RANDOM_ARRAY[768 + 2])
+        if queenside:
+            new_hash ^= (POLYGLOT_RANDOM_ARRAY[768 + 1]) if board.turn else (POLYGLOT_RANDOM_ARRAY[768 + 3])
         diff = chess.square_file(move.from_square) - chess.square_file(move.to_square)
         if abs(diff) > 1:
             # Is Castling
@@ -299,38 +333,21 @@ def update_hash(hash: int, board: chess.Board, move: chess.Move):
 
             new_hash ^= POLYGLOT_RANDOM_ARRAY[64 * rook_index + rook_square_source]
             new_hash ^= POLYGLOT_RANDOM_ARRAY[64 * rook_index + rook_square_target]
-            # Remove castling rights
-            if board.has_kingside_castling_rights(board.turn):
-                new_hash ^= (POLYGLOT_RANDOM_ARRAY[768]) if board.turn else (POLYGLOT_RANDOM_ARRAY[768 + 2])
-            if board.has_queenside_castling_rights(board.turn):
-                new_hash ^= (POLYGLOT_RANDOM_ARRAY[768 + 1]) if board.turn else (POLYGLOT_RANDOM_ARRAY[768 + 3])
 
             return new_hash
-        else:
-            # Check castling rights and remove them
-            if board.has_kingside_castling_rights(board.turn):
-                new_hash ^= (POLYGLOT_RANDOM_ARRAY[768]) if board.turn else (POLYGLOT_RANDOM_ARRAY[768 + 2])
-            if board.has_queenside_castling_rights(board.turn):
-                new_hash ^= (POLYGLOT_RANDOM_ARRAY[768 + 1]) if board.turn else (POLYGLOT_RANDOM_ARRAY[768 + 3])
-    
-    if src_piece_type == chess.ROOK:
+    elif src_piece_type == chess.ROOK:
         # Remove castling rights depending on rook move
+
         if board.turn:
-            if move.from_square == chess.A1:
-                if board.has_queenside_castling_rights(chess.WHITE):
-                    new_hash ^= (POLYGLOT_RANDOM_ARRAY[768 + 1])
-            elif move.from_square == chess.H1:
-                if board.has_kingside_castling_rights(chess.WHITE):
-                    new_hash ^= (POLYGLOT_RANDOM_ARRAY[768])
+            if move.from_square == chess.A1 and board.has_queenside_castling_rights(chess.WHITE):
+                new_hash ^= (POLYGLOT_RANDOM_ARRAY[768 + 1])
+            elif move.from_square == chess.H1 and board.has_kingside_castling_rights(chess.WHITE):
+                new_hash ^= (POLYGLOT_RANDOM_ARRAY[768])
         else:
-            if move.from_square == chess.A8:
-                if board.has_queenside_castling_rights(chess.BLACK):
-                    new_hash ^= (POLYGLOT_RANDOM_ARRAY[768 + 3])
-            elif move.from_square == chess.H8:
-                if board.has_kingside_castling_rights(chess.BLACK):
-                    new_hash ^= (POLYGLOT_RANDOM_ARRAY[768 + 2])
-    
-    dest_piece_type = board.piece_type_at(move.to_square)
+            if move.from_square == chess.A8 and board.has_queenside_castling_rights(chess.BLACK):
+                new_hash ^= (POLYGLOT_RANDOM_ARRAY[768 + 3])
+            elif move.from_square == chess.H8 and board.has_kingside_castling_rights(chess.BLACK):
+                new_hash ^= (POLYGLOT_RANDOM_ARRAY[768 + 2])
 
     if dest_piece_type:
         # If we capture, remove the captured piece first
@@ -339,19 +356,15 @@ def update_hash(hash: int, board: chess.Board, move: chess.Move):
         if dest_piece_type == chess.ROOK:
             # Remove castling rights depending on rook
             if board.turn:
-                if move.to_square == chess.A8:
-                    if board.has_queenside_castling_rights(chess.BLACK):
-                        new_hash ^= (POLYGLOT_RANDOM_ARRAY[768 + 3])
-                elif move.to_square == chess.H8:
-                    if board.has_kingside_castling_rights(chess.BLACK):
-                        new_hash ^= (POLYGLOT_RANDOM_ARRAY[768 + 2])
+                if move.to_square == chess.A8 and board.has_queenside_castling_rights(chess.BLACK):
+                    new_hash ^= (POLYGLOT_RANDOM_ARRAY[768 + 3])
+                elif move.to_square == chess.H8 and board.has_kingside_castling_rights(chess.BLACK):
+                    new_hash ^= (POLYGLOT_RANDOM_ARRAY[768 + 2])
             else:
-                if move.to_square == chess.A1:
-                    if board.has_queenside_castling_rights(chess.WHITE):
-                        new_hash ^= (POLYGLOT_RANDOM_ARRAY[768 + 1])
-                elif move.to_square == chess.H1:
-                    if board.has_kingside_castling_rights(chess.WHITE):
-                        new_hash ^= (POLYGLOT_RANDOM_ARRAY[768])
+                if move.to_square == chess.A1 and board.has_queenside_castling_rights(chess.WHITE):
+                    new_hash ^= (POLYGLOT_RANDOM_ARRAY[768 + 1])
+                elif move.to_square == chess.H1 and board.has_kingside_castling_rights(chess.WHITE):
+                    new_hash ^= (POLYGLOT_RANDOM_ARRAY[768])
     elif move.to_square == board.ep_square and src_piece_type == chess.PAWN:
         # En-passant capture
         down = -8 if board.turn == chess.WHITE else 8
@@ -382,7 +395,8 @@ if __name__ == '__main__':
         hash = zobrist_hash(board)
         while True:
             move = random.choice(list(board.legal_moves))
-            hash = update_hash(hash, board, move)
+            (_, src, dest) = calculate_move_value(move, board)
+            hash = update_hash(hash, board, move, src, dest)
             board.push(move)
             real_hash = zobrist_hash(board)
             assert hash == real_hash

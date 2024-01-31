@@ -115,14 +115,14 @@ def set_king_position_values(lategame: bool):
         position_value[chess.BLACK][chess.KING] = king_table.copy()
 
 def calculate_move_value(move: chess.Move, board: chess.Board):
-    castle_value = _check_castling(board, move)
-    if castle_value is not None:
-        return castle_value
-    
-    value = 0
     src_piece = board.piece_type_at(move.from_square)
     dest_piece = board.piece_type_at(move.to_square)
+
+    castle_value = _check_castling(board, move, src_piece)
+    if castle_value is not None:
+        return (castle_value, src_piece, dest_piece)
     
+    value = 0
     if move.promotion:
         prom = move.promotion
         pos_score = position_value[board.turn][prom][move.to_square] - position_value[board.turn][src_piece][move.from_square]
@@ -139,7 +139,7 @@ def calculate_move_value(move: chess.Move, board: chess.Board):
         capture_square = board.ep_square + down
         value += piece_value[chess.PAWN] + position_value[not board.turn][chess.PAWN][capture_square]
 
-    return value
+    return (value, src_piece, dest_piece)
 
 def calculate_move_value_quiescence(move: chess.Move, board: chess.Board):    
     value = 0
@@ -169,8 +169,8 @@ def calculate_move_value_quiescence(move: chess.Move, board: chess.Board):
 
     return (value, src_piece_value, dest_piece_value)
 
-def _check_castling(board: chess.Board, move: chess.Move):
-    if board.kings & chess.BB_SQUARES[move.from_square]:
+def _check_castling(board: chess.Board, move: chess.Move, src_piece: chess.PieceType):
+    if src_piece == chess.KING:
         diff = chess.square_file(move.from_square) - chess.square_file(move.to_square)
         if abs(diff) > 1:
             return K_CASTLING_VALUE if diff < 0 else Q_CASTLING_VALUE

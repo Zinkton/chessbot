@@ -86,7 +86,8 @@ def _mtdf(root: MtdfNode, depth: int, board: chess.Board, repetition_move: Optio
 
     upper_bound = MAX_VALUE + depth
     lower_bound = -MAX_VALUE - depth
-
+    result_move = None
+    result_score = -MAX_VALUE - depth
     while upper_bound - lower_bound > 0:
         beta = root.gamma + 1 if root.gamma == lower_bound else root.gamma
         (best_move, root.gamma) = _alpha_beta(root.value, beta - 1, beta, depth, board, root.hash, repetition_move)
@@ -94,15 +95,18 @@ def _mtdf(root: MtdfNode, depth: int, board: chess.Board, repetition_move: Optio
         if root.gamma < beta:
             upper_bound = root.gamma
         else:
+            if (root.gamma > result_score):
+                result_score = root.gamma
+                result_move = best_move
             lower_bound = root.gamma
     
-    if repetition_move is None or repetition_move.from_square != best_move.from_square or repetition_move.to_square != best_move.to_square:
+    if repetition_move is None or repetition_move.from_square != result_move.from_square or repetition_move.to_square != result_move.to_square:
         save_tt_score(tt_scores, depth + 1, board.turn, constants.EXACT, pos_result, root.hash, root.gamma)
 
-    return best_move, root.gamma
+    return result_move, root.gamma
 
 # @profile
-def _evaluate_child(value: int, parent_hash: int, move: chess.Move, depth_left: int, alpha: int, beta: int, board: chess.Board, best_score: Tuple[Optional[chess.Move], int], repetition_move: Optional[chess.Move] = None) -> Tuple[int, int, int, Tuple[Optional[chess.Move], int]]:
+def _evaluate_child(value: int, hash: int, move: chess.Move, depth_left: int, alpha: int, beta: int, board: chess.Board, best_score: Tuple[Optional[chess.Move], int], repetition_move: Optional[chess.Move] = None) -> Tuple[int, int, int, Tuple[Optional[chess.Move], int]]:
     if repetition_move is not None and repetition_move.from_square == move.from_square and repetition_move.to_square == move.to_square:
         score = 0
         if score >= beta:
@@ -114,8 +118,7 @@ def _evaluate_child(value: int, parent_hash: int, move: chess.Move, depth_left: 
                 alpha = score
 
         return score, alpha, beta, best_score
-
-    hash = update_hash(parent_hash, board, move)
+    
     score = None
 
     saved_value = probe_tt_scores(tt_scores, hash)
@@ -159,23 +162,26 @@ def _alpha_beta(value: int, alpha: int, beta: int, depth_left: int, board: chess
     # Killer move
     killer_move = probe_tt_killers(tt_killers, hash)
     if killer_move is not None:
-        move_value = calculate_move_value(killer_move, board)
-        score, alpha, beta, best_score = _evaluate_child(move_value - value, hash, killer_move, depth_left, alpha, beta, board, best_score, repetition_move)
+        (move_value, src_piece, dest_piece) = calculate_move_value(killer_move, board)
+        child_hash = update_hash(hash, board, killer_move, src_piece, dest_piece)
+        score, alpha, beta, best_score = _evaluate_child(move_value - value, child_hash, killer_move, depth_left, alpha, beta, board, best_score, repetition_move)
         if best_score[0] is None:
             return (killer_move, score) # fail-soft beta-cutoff
 
     move_generator = generate_ordered_legal_moves(board, killer_move, history)
 
     # Captures
-    for move, move_value in next(move_generator):
-        score, alpha, beta, best_score = _evaluate_child(move_value - value, hash, move, depth_left, alpha, beta, board, best_score, repetition_move)
+    for move, (move_value, src_piece, dest_piece) in next(move_generator):
+        child_hash = update_hash(hash, board, move, src_piece, dest_piece)
+        score, alpha, beta, best_score = _evaluate_child(move_value - value, child_hash, move, depth_left, alpha, beta, board, best_score, repetition_move)
         if best_score[0] is None:
             save_tt_killer(tt_killers, move, hash)
             return (move, score) # fail-soft beta-cutoff
         
     # Other moves
-    for move, move_value in next(move_generator):
-        score, alpha, beta, best_score = _evaluate_child(move_value - value, hash, move, depth_left, alpha, beta, board, best_score, repetition_move)
+    for move, (move_value, src_piece, dest_piece) in next(move_generator):
+        child_hash = update_hash(hash, board, move, src_piece, dest_piece)
+        score, alpha, beta, best_score = _evaluate_child(move_value - value, child_hash, move, depth_left, alpha, beta, board, best_score, repetition_move)
         if best_score[0] is None:
             save_tt_killer(tt_killers, move, hash)
             update_history(move, depth_left, board.turn)

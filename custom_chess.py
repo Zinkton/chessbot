@@ -3284,9 +3284,7 @@ class Board(BaseBoard):
         castling rights.
         """
         backrank = BB_RANK_1 if color == WHITE else BB_RANK_8
-        king_mask = self.kings & self.occupied_co[color] & backrank & ~self.promoted
-        if not king_mask:
-            return False
+        king_mask = self.kings & self.occupied_co[color] & backrank
 
         castling_rights = self.clean_castling_rights() & backrank
         while castling_rights:

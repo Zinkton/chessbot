@@ -1,4 +1,6 @@
+import random
 import time
+from typing import Iterator
 import uuid
 import custom_chess as chess
 from mtdf import solve_position_root
@@ -106,11 +108,11 @@ from mtdf import solve_position_root
 # print(f"Unpacked values: d = {d}, s = {s}, t = {t}")
 
 if __name__ == '__main__':
-    board = chess.Board('R7/1p5p/2p2p1k/4pq2/8/8/4n1R1/7K b - - 7 55')
-    game_id = uuid.uuid4()
-    result = solve_position_root(board, game_id, 8)
-    board.push(result[0])
-    print(result)
+    # board = chess.Board('R7/1p5p/2p2p1k/4pq2/8/8/4n1R1/7K b - - 7 55')
+    # game_id = uuid.uuid4()
+    # result = solve_position_root(board, game_id, 8)
+    # board.push(result[0])
+    # print(result)
     # start = time.perf_counter()
     # for x in range(5):
     #     result = solve_position_root(board, game_id, 6)
@@ -118,3 +120,42 @@ if __name__ == '__main__':
     #     board.push(result[0])
 
     # print(time.perf_counter() - start)
+    # num = 123456789
+    # iterations = 100000000000
+
+    # start = time.perf_counter()
+    # for i in range(iterations):
+    #     if (i % 2 == 0):
+    #         num ^= 987654321 & i | i >> 2
+    #     else:
+    #         num ^= 987654321 & i | i << 2
+    #     if (i % 100000000 == 0):
+    #         print(i)
+
+    # print(time.perf_counter() - start)
+    
+    start = time.perf_counter()
+    games = []
+    for x in range(100):
+        board = chess.Board()
+        game = []
+        while True:
+            legal_moves = list(board.legal_moves)
+            random_legal_move = random.choice(legal_moves)
+            game.append((random_legal_move, legal_moves, board.board_fen()))
+            board.push(random_legal_move)
+            if board.outcome():
+                break
+        games.append((game, board.outcome().termination))
+    
+    f = open("legal_moves_test.txt", "w+")
+    f.write(str(len(games)) + "\n")
+    for game, termination in games:
+        f.write(str(len(game)) + '\n')
+        for move, legal_moves, fen in game:
+            f.write(str(move) + "\n")
+            f.write(" ".join([str(move) for move in legal_moves]) + "\n")
+            f.write(fen + "\n")
+        f.write(str(termination) + "\n")
+    f.close()
+    print(time.perf_counter() - start)

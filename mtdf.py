@@ -95,7 +95,9 @@ def _mtdf(root: MtdfNode, depth: int, board: chess.Board, repetition_move: Optio
         if root.gamma < beta:
             upper_bound = root.gamma
         else:
-            if (root.gamma > result_score):
+            if root.gamma == result_score and not result_move:
+                result_move = best_move
+            elif root.gamma > result_score:
                 result_score = root.gamma
                 result_move = best_move
             lower_bound = root.gamma
@@ -156,7 +158,7 @@ def _evaluate_child(value: int, hash: int, move: chess.Move, depth_left: int, al
 def _alpha_beta(value: int, alpha: int, beta: int, depth_left: int, board: chess.Board, hash: int, repetition_move: Optional[chess.Move] = None) -> Tuple[Optional[chess.Move], int]:
     if depth_left == 0:
         return (None, _quiescence(value, alpha, beta, board, True))
-    
+
     best_score = (None, -(MAX_VALUE + depth_left - 1))
 
     # Killer move
